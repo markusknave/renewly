@@ -1,0 +1,56 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: "Public HTTPS URL of your Renewly server (overrides the repository variable)"
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android 36 SDK
+        run: sdkmanager "platforms;android-36"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Point the app at the Renewly server
+        env:
+          RENEWLY_APP_URL: ${{ inputs.server_url || vars.RENEWLY_APP_URL }}
+        run: |
+          if [ -z "$RENEWLY_APP_URL" ]; then
+            echo "Set the repository variable RENEWLY_APP_URL to your HTTPS Renewly URL."
+            exit 1
+          fi
+          node -e "const fs=require('fs');const file='capacitor.config.json';const config=JSON.parse(fs.readFileSync(file,'utf8'));config.server.url=process.env.RENEWLY_APP_URL;fs.writeFileSync(file,JSON.stringify(config,null,2)+'\n');"
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: renewly-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
