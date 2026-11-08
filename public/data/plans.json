@@ -1,0 +1,1073 @@
+{
+  "schemaVersion": 1,
+  "region": "PH",
+  "currency": "PHP",
+  "generatedAt": "2026-11-09T01:47:44.713+08:00",
+  "fx": {
+    "base": "USD",
+    "rate": 63.064627,
+    "fetchedAt": "2026-11-09T01:38:33+08:00",
+    "source": "https://open.er-api.com/v6/latest/USD"
+  },
+  "platforms": [
+    {
+      "key": "netflix",
+      "name": "Netflix",
+      "category": "streaming",
+      "site": "https://www.netflix.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "mobile",
+          "name": "Mobile",
+          "amountCents": 16900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 16900,
+            "currency": "PHP",
+            "amountText": "₱169/month"
+          },
+          "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "169",
+            "sha256": "a313d85573c4e222d76785043907f33420c66af65a00be44554ab13a146ac523"
+          }
+        },
+        {
+          "id": "basic",
+          "name": "Basic",
+          "amountCents": 27900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 27900,
+            "currency": "PHP",
+            "amountText": "₱279/month"
+          },
+          "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "279",
+            "sha256": "a313d85573c4e222d76785043907f33420c66af65a00be44554ab13a146ac523"
+          }
+        },
+        {
+          "id": "standard",
+          "name": "Standard",
+          "amountCents": 44900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 44900,
+            "currency": "PHP",
+            "amountText": "₱449/month"
+          },
+          "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "449",
+            "sha256": "a313d85573c4e222d76785043907f33420c66af65a00be44554ab13a146ac523"
+          }
+        },
+        {
+          "id": "premium",
+          "name": "Premium",
+          "amountCents": 61900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 61900,
+            "currency": "PHP",
+            "amountText": "₱619/month"
+          },
+          "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "619",
+            "sha256": "a313d85573c4e222d76785043907f33420c66af65a00be44554ab13a146ac523"
+          }
+        }
+      ]
+    },
+    {
+      "key": "spotify",
+      "name": "Spotify",
+      "category": "music",
+      "site": "https://www.spotify.com",
+      "managePath": "/ph-en/account/overview/",
+      "plans": [
+        {
+          "id": "individual",
+          "name": "Premium Individual",
+          "amountCents": 16900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 16900,
+            "currency": "PHP",
+            "amountText": "₱169/month"
+          },
+          "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "169",
+            "sha256": "6c4c1ef91c522b3c05c28456f64cc77e7943c9f0d4a495df2825f40777e9df16"
+          }
+        },
+        {
+          "id": "student",
+          "name": "Premium Student",
+          "amountCents": 8500,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 8500,
+            "currency": "PHP",
+            "amountText": "₱85/month"
+          },
+          "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "85",
+            "sha256": "6c4c1ef91c522b3c05c28456f64cc77e7943c9f0d4a495df2825f40777e9df16"
+          }
+        },
+        {
+          "id": "duo",
+          "name": "Premium Duo",
+          "amountCents": 22900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 22900,
+            "currency": "PHP",
+            "amountText": "₱229/month"
+          },
+          "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "229",
+            "sha256": "6c4c1ef91c522b3c05c28456f64cc77e7943c9f0d4a495df2825f40777e9df16"
+          }
+        },
+        {
+          "id": "family",
+          "name": "Premium Family",
+          "amountCents": 27900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 27900,
+            "currency": "PHP",
+            "amountText": "₱279/month"
+          },
+          "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "279",
+            "sha256": "6c4c1ef91c522b3c05c28456f64cc77e7943c9f0d4a495df2825f40777e9df16"
+          }
+        }
+      ]
+    },
+    {
+      "key": "apple-music",
+      "name": "Apple Music",
+      "category": "music",
+      "site": "https://music.apple.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "individual",
+          "name": "Individual",
+          "amountCents": 16900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 16900,
+            "currency": "PHP",
+            "amountText": "₱169/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-music/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "169",
+            "sha256": "73d782b5fbaa15821f6378a9a13ea2804403f8607e7fec5f9db46d9082d7b532"
+          }
+        },
+        {
+          "id": "family",
+          "name": "Family",
+          "amountCents": 27900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 27900,
+            "currency": "PHP",
+            "amountText": "₱279/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-music/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "279",
+            "sha256": "73d782b5fbaa15821f6378a9a13ea2804403f8607e7fec5f9db46d9082d7b532"
+          }
+        },
+        {
+          "id": "student",
+          "name": "Student",
+          "amountCents": 8500,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 8500,
+            "currency": "PHP",
+            "amountText": "₱85/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-music/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "85",
+            "sha256": "73d782b5fbaa15821f6378a9a13ea2804403f8607e7fec5f9db46d9082d7b532"
+          }
+        }
+      ]
+    },
+    {
+      "key": "apple-tv",
+      "name": "Apple TV",
+      "category": "streaming",
+      "site": "https://tv.apple.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "monthly",
+          "name": "Apple TV",
+          "amountCents": 36900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 36900,
+            "currency": "PHP",
+            "amountText": "₱369/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-tv/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "369",
+            "sha256": "4e524d809bbaf64bed874bbcaca83f199f52f381d8bfbb5b48a8942fd0eca5c3"
+          }
+        }
+      ]
+    },
+    {
+      "key": "icloud-plus",
+      "name": "iCloud+",
+      "category": "cloud-storage",
+      "site": "https://www.icloud.com",
+      "managePath": "/settings",
+      "plans": [
+        {
+          "id": "50gb",
+          "name": "iCloud+ 50 GB",
+          "amountCents": 5900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 5900,
+            "currency": "PHP",
+            "amountText": "₱59/month"
+          },
+          "sourceUrl": "https://support.apple.com/en-ph/108047",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": null,
+            "sha256": "890049138777fc5a3d89a9beef685463e27e79a91019c9fb6d334cf4da1cbf13"
+          }
+        },
+        {
+          "id": "200gb",
+          "name": "iCloud+ 200 GB",
+          "amountCents": 19900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 19900,
+            "currency": "PHP",
+            "amountText": "₱199/month"
+          },
+          "sourceUrl": "https://support.apple.com/en-ph/108047",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": null,
+            "sha256": "890049138777fc5a3d89a9beef685463e27e79a91019c9fb6d334cf4da1cbf13"
+          }
+        },
+        {
+          "id": "2tb",
+          "name": "iCloud+ 2 TB",
+          "amountCents": 69900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 69900,
+            "currency": "PHP",
+            "amountText": "₱699/month"
+          },
+          "sourceUrl": "https://support.apple.com/en-ph/108047",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": null,
+            "sha256": "890049138777fc5a3d89a9beef685463e27e79a91019c9fb6d334cf4da1cbf13"
+          }
+        }
+      ]
+    },
+    {
+      "key": "microsoft-365",
+      "name": "Microsoft 365",
+      "category": "software",
+      "site": "https://account.microsoft.com",
+      "managePath": "/services",
+      "plans": [
+        {
+          "id": "personal",
+          "name": "Microsoft 365 Personal",
+          "amountCents": 48900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 48900,
+            "currency": "PHP",
+            "amountText": "₱489/month"
+          },
+          "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "489.00",
+            "sha256": "f46192e25fddd52d8e8d5e794ebdb1b5858b54dd9c4bf3115e3fbe4a59d6dbce"
+          }
+        },
+        {
+          "id": "personal-annual",
+          "name": "Microsoft 365 Personal (Annual)",
+          "amountCents": 489900,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 489900,
+            "currency": "PHP",
+            "amountText": "₱4,899/year"
+          },
+          "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "4,899.00",
+            "sha256": "f46192e25fddd52d8e8d5e794ebdb1b5858b54dd9c4bf3115e3fbe4a59d6dbce"
+          }
+        },
+        {
+          "id": "family",
+          "name": "Microsoft 365 Family",
+          "amountCents": 60900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 60900,
+            "currency": "PHP",
+            "amountText": "₱609/month"
+          },
+          "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "609.00",
+            "sha256": "f46192e25fddd52d8e8d5e794ebdb1b5858b54dd9c4bf3115e3fbe4a59d6dbce"
+          }
+        },
+        {
+          "id": "family-annual",
+          "name": "Microsoft 365 Family (Annual)",
+          "amountCents": 609900,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 609900,
+            "currency": "PHP",
+            "amountText": "₱6,099/year"
+          },
+          "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "6,099.00",
+            "sha256": "f46192e25fddd52d8e8d5e794ebdb1b5858b54dd9c4bf3115e3fbe4a59d6dbce"
+          }
+        },
+        {
+          "id": "premium",
+          "name": "Microsoft 365 Premium",
+          "amountCents": 109900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 109900,
+            "currency": "PHP",
+            "amountText": "₱1,099/month"
+          },
+          "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "1,099.00",
+            "sha256": "f46192e25fddd52d8e8d5e794ebdb1b5858b54dd9c4bf3115e3fbe4a59d6dbce"
+          }
+        }
+      ]
+    },
+    {
+      "key": "google-one",
+      "name": "Google One",
+      "category": "cloud-storage",
+      "site": "https://one.google.com",
+      "managePath": "/settings",
+      "plans": [
+        {
+          "id": "lite-30gb",
+          "name": "Google One Lite (30 GB)",
+          "amountCents": 4900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 4900,
+            "currency": "PHP",
+            "amountText": "₱49/month"
+          },
+          "sourceUrl": "https://one.google.com/about/plans?hl=en-PH&gl=PH",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "49",
+            "sha256": "0513fbf07aa9e4c03741b23113c351f9887fc697399f59cfa7b37fb341f81636"
+          }
+        },
+        {
+          "id": "basic-100gb",
+          "name": "Google One Basic (100 GB)",
+          "amountCents": 11900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 11900,
+            "currency": "PHP",
+            "amountText": "₱119/month"
+          },
+          "sourceUrl": "https://one.google.com/about/plans?hl=en-PH&gl=PH",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "119",
+            "sha256": "0513fbf07aa9e4c03741b23113c351f9887fc697399f59cfa7b37fb341f81636"
+          }
+        },
+        {
+          "id": "ai-pro-5tb",
+          "name": "Google AI Pro (5 TB)",
+          "amountCents": 110000,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 110000,
+            "currency": "PHP",
+            "amountText": "₱1,100/month"
+          },
+          "sourceUrl": "https://one.google.com/about/plans?hl=en-PH&gl=PH",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "1,100",
+            "sha256": "0513fbf07aa9e4c03741b23113c351f9887fc697399f59cfa7b37fb341f81636"
+          }
+        }
+      ]
+    },
+    {
+      "key": "disney-plus",
+      "name": "Disney+",
+      "category": "streaming",
+      "site": "https://www.disneyplus.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "standard",
+          "name": "Disney+ Standard",
+          "amountCents": 28900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 28900,
+            "currency": "PHP",
+            "amountText": "₱289/month"
+          },
+          "sourceUrl": "https://www.disneyplus.com/en-ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "289",
+            "sha256": "e0143d56b1e4b9dc5755f69f5da3ec5fabbafd8f3b3794c16b50292868593178"
+          }
+        },
+        {
+          "id": "standard-annual",
+          "name": "Disney+ Standard (Annual)",
+          "amountCents": 229000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 229000,
+            "currency": "PHP",
+            "amountText": "₱2,290/year"
+          },
+          "sourceUrl": "https://www.disneyplus.com/en-ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "2,290",
+            "sha256": "e0143d56b1e4b9dc5755f69f5da3ec5fabbafd8f3b3794c16b50292868593178"
+          }
+        },
+        {
+          "id": "premium",
+          "name": "Disney+ Premium",
+          "amountCents": 59900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 59900,
+            "currency": "PHP",
+            "amountText": "₱599/month"
+          },
+          "sourceUrl": "https://www.disneyplus.com/en-ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "599",
+            "sha256": "e0143d56b1e4b9dc5755f69f5da3ec5fabbafd8f3b3794c16b50292868593178"
+          }
+        },
+        {
+          "id": "premium-annual",
+          "name": "Disney+ Premium (Annual)",
+          "amountCents": 485000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 485000,
+            "currency": "PHP",
+            "amountText": "₱4,850/year"
+          },
+          "sourceUrl": "https://www.disneyplus.com/en-ph",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "4,850",
+            "sha256": "e0143d56b1e4b9dc5755f69f5da3ec5fabbafd8f3b3794c16b50292868593178"
+          }
+        }
+      ]
+    },
+    {
+      "key": "hbo-max",
+      "name": "HBO Max",
+      "category": "streaming",
+      "site": "https://www.hbomax.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "standard-annual",
+          "name": "HBO Max Standard (Annual)",
+          "amountCents": 189000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 189000,
+            "currency": "PHP",
+            "amountText": "₱1,890/year"
+          },
+          "sourceUrl": "https://www.hbomax.com/ph/en",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "1,890.00",
+            "sha256": "62df8e074b46d5f48835737ead1b2824c626fc53c92e0f5cba30cb62ddbf793c"
+          }
+        },
+        {
+          "id": "premium-annual",
+          "name": "HBO Max Premium (Annual)",
+          "amountCents": 279000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 279000,
+            "currency": "PHP",
+            "amountText": "₱2,790/year"
+          },
+          "sourceUrl": "https://www.hbomax.com/ph/en",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "2,790.00",
+            "sha256": "62df8e074b46d5f48835737ead1b2824c626fc53c92e0f5cba30cb62ddbf793c"
+          }
+        }
+      ]
+    },
+    {
+      "key": "prime-video",
+      "name": "Prime Video",
+      "category": "streaming",
+      "site": "https://www.primevideo.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "monthly",
+          "name": "Prime Video",
+          "amountCents": 24900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 24900,
+            "currency": "PHP",
+            "amountText": "₱249/month"
+          },
+          "sourceUrl": "https://www.primevideo.com/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "249",
+            "sha256": "84cf3c30ae480543c0df56150a02b23493cbcc91bd26b9747f47713bbd9dbb79"
+          }
+        },
+        {
+          "id": "annual",
+          "name": "Prime Video (Annual)",
+          "amountCents": 166900,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 166900,
+            "currency": "PHP",
+            "amountText": "₱1,669/year"
+          },
+          "sourceUrl": "https://www.primevideo.com/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "1,669",
+            "sha256": "84cf3c30ae480543c0df56150a02b23493cbcc91bd26b9747f47713bbd9dbb79"
+          }
+        }
+      ]
+    },
+    {
+      "key": "youtube-premium",
+      "name": "YouTube Premium",
+      "category": "streaming",
+      "site": "https://www.youtube.com",
+      "managePath": "/paid_memberships",
+      "plans": [
+        {
+          "id": "lite",
+          "name": "Premium Lite",
+          "amountCents": 10900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 10900,
+            "currency": "PHP",
+            "amountText": "₱109/month"
+          },
+          "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "109.00",
+            "sha256": "da964f7fcfe1cfbb2cff785cab73c916cc96b3ba00046f781abfea823023cce7"
+          }
+        },
+        {
+          "id": "individual",
+          "name": "Premium Individual",
+          "amountCents": 18900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 18900,
+            "currency": "PHP",
+            "amountText": "₱189/month"
+          },
+          "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "189.00",
+            "sha256": "da964f7fcfe1cfbb2cff785cab73c916cc96b3ba00046f781abfea823023cce7"
+          }
+        },
+        {
+          "id": "family",
+          "name": "Premium Family",
+          "amountCents": 37900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 37900,
+            "currency": "PHP",
+            "amountText": "₱379/month"
+          },
+          "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "379.00",
+            "sha256": "da964f7fcfe1cfbb2cff785cab73c916cc96b3ba00046f781abfea823023cce7"
+          }
+        },
+        {
+          "id": "student",
+          "name": "Premium Student",
+          "amountCents": 11500,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 11500,
+            "currency": "PHP",
+            "amountText": "₱115/month"
+          },
+          "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "115.00",
+            "sha256": "da964f7fcfe1cfbb2cff785cab73c916cc96b3ba00046f781abfea823023cce7"
+          }
+        }
+      ]
+    },
+    {
+      "key": "apple-one",
+      "name": "Apple One",
+      "category": "memberships",
+      "site": "https://one.apple.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "individual",
+          "name": "Apple One Individual",
+          "amountCents": 49900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 49900,
+            "currency": "PHP",
+            "amountText": "₱499/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-one/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "499",
+            "sha256": "86b36a3e70a0d90e9f328f0e06174eca151b062b353a79cb17d8e6409ad7455c"
+          }
+        },
+        {
+          "id": "family",
+          "name": "Apple One Family",
+          "amountCents": 62900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 62900,
+            "currency": "PHP",
+            "amountText": "₱629/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-one/",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "629",
+            "sha256": "86b36a3e70a0d90e9f328f0e06174eca151b062b353a79cb17d8e6409ad7455c"
+          }
+        }
+      ]
+    },
+    {
+      "key": "claude",
+      "name": "Claude",
+      "category": "ai",
+      "site": "https://claude.com",
+      "managePath": "/settings/billing",
+      "plans": [
+        {
+          "id": "pro",
+          "name": "Claude Pro",
+          "amountCents": 126129,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 2000,
+            "currency": "USD",
+            "amountText": "$20/month"
+          },
+          "sourceUrl": "https://claude.com/pricing",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "20",
+            "sha256": "3a85c65b9cd8f5d52ba139dd902a0b63bd15991b60881ee0f6f83651edd56537"
+          }
+        }
+      ]
+    },
+    {
+      "key": "chatgpt",
+      "name": "ChatGPT",
+      "category": "ai",
+      "site": "https://chatgpt.com",
+      "managePath": "/#settings",
+      "plans": [
+        {
+          "id": "plus",
+          "name": "ChatGPT Plus",
+          "amountCents": 126129,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 2000,
+            "currency": "USD",
+            "amountText": "$20/month"
+          },
+          "sourceUrl": "https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus",
+          "verifiedAt": "2026-11-09"
+        }
+      ]
+    },
+    {
+      "key": "notion",
+      "name": "Notion",
+      "category": "software",
+      "site": "https://www.notion.com",
+      "managePath": "/settings",
+      "plans": [
+        {
+          "id": "plus",
+          "name": "Notion Plus",
+          "amountCents": 63065,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 1000,
+            "currency": "USD",
+            "amountText": "$10 per member/month"
+          },
+          "sourceUrl": "https://www.notion.com/pricing",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "10",
+            "sha256": "3bcb6b1a680c6d5b8c50cb28da157ff8738b1b684b19c8653240272609e75cf4"
+          }
+        },
+        {
+          "id": "business",
+          "name": "Notion Business",
+          "amountCents": 126129,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 2000,
+            "currency": "USD",
+            "amountText": "$20 per member/month"
+          },
+          "sourceUrl": "https://www.notion.com/pricing",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "20",
+            "sha256": "3bcb6b1a680c6d5b8c50cb28da157ff8738b1b684b19c8653240272609e75cf4"
+          }
+        }
+      ]
+    },
+    {
+      "key": "dropbox",
+      "name": "Dropbox",
+      "category": "cloud-storage",
+      "site": "https://www.dropbox.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "plus",
+          "name": "Dropbox Plus",
+          "amountCents": 63002,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 999,
+            "currency": "USD",
+            "amountText": "$9.99/month"
+          },
+          "sourceUrl": "https://www.dropbox.com/plans",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "9.99",
+            "sha256": "f799d10e22b60ac83fcc15ca1d7f9ec69308b425ee882257d6ba10e57202ead9"
+          }
+        }
+      ]
+    },
+    {
+      "key": "github-copilot",
+      "name": "GitHub Copilot",
+      "category": "software",
+      "site": "https://github.com",
+      "managePath": "/settings/copilot",
+      "plans": [
+        {
+          "id": "pro",
+          "name": "GitHub Copilot Pro",
+          "amountCents": 63065,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 1000,
+            "currency": "USD",
+            "amountText": "$10 per user/month"
+          },
+          "sourceUrl": "https://github.com/features/copilot/plans",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "10",
+            "sha256": "8316f7e4f3153e14a4f711260fdcbc715fc2b7b35cae3d1901303614074fb98a"
+          }
+        }
+      ]
+    },
+    {
+      "key": "minecraft-realms",
+      "name": "Minecraft Realms",
+      "category": "gaming",
+      "site": "https://www.minecraft.net",
+      "managePath": "/msa",
+      "plans": [
+        {
+          "id": "realms",
+          "name": "Minecraft Realms",
+          "amountCents": 25163,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 399,
+            "currency": "USD",
+            "amountText": "$3.99/month"
+          },
+          "sourceUrl": "https://www.minecraft.net/en-us/realms",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "3.99",
+            "sha256": "a4c1ce47b1af2b257453bfa605cb931be8ce21276464a4bf0c0f329cb585d800"
+          }
+        },
+        {
+          "id": "realms-plus",
+          "name": "Minecraft Realms Plus",
+          "amountCents": 50389,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 799,
+            "currency": "USD",
+            "amountText": "$7.99/month"
+          },
+          "sourceUrl": "https://www.minecraft.net/en-us/realms",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "7.99",
+            "sha256": "a4c1ce47b1af2b257453bfa605cb931be8ce21276464a4bf0c0f329cb585d800"
+          }
+        }
+      ]
+    },
+    {
+      "key": "discord-nitro",
+      "name": "Discord Nitro",
+      "category": "gaming",
+      "site": "https://discord.com",
+      "managePath": "/settings/subscriptions",
+      "plans": [
+        {
+          "id": "nitro",
+          "name": "Discord Nitro",
+          "amountCents": 63002,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 999,
+            "currency": "USD",
+            "amountText": "$9.99/month"
+          },
+          "sourceUrl": "https://discord.com/nitro",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "9.99",
+            "sha256": "9068c4513954195453e85c7a37f5bc479120d77f33c8ae438130ce2692e5e300"
+          }
+        },
+        {
+          "id": "nitro-basic",
+          "name": "Discord Nitro Basic",
+          "amountCents": 18856,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 299,
+            "currency": "USD",
+            "amountText": "$2.99/month"
+          },
+          "sourceUrl": "https://discord.com/nitro",
+          "verifiedAt": "2026-11-09",
+          "fetched": {
+            "at": "2026-11-09T01:47:44.713+08:00",
+            "priceText": "2.99",
+            "sha256": "9068c4513954195453e85c7a37f5bc479120d77f33c8ae438130ce2692e5e300"
+          }
+        }
+      ]
+    }
+  ]
+}

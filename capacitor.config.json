@@ -2,11 +2,6 @@
   "appId": "com.renewly.app",
   "appName": "Renewly",
   "webDir": "public",
-  "server": {
-    "url": "https://renewly.example.com",
-    "androidScheme": "https",
-    "cleartext": false
-  },
   "android": {
     "allowMixedContent": false,
     "captureInput": true,

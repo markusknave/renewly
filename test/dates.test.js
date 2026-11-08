@@ -8,7 +8,7 @@ import {
   parseDateLoose,
   todayInTz,
   yearlyCents,
-} from '../src/lib/dates.js';
+} from '../public/js/lib/dates.js';
 
 test('parseAmount handles common receipt formats', () => {
   assert.deepEqual(parseAmount('Total: $15.49'), { cents: 1549, currency: 'USD' });

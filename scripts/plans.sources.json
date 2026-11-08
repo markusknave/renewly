@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "note": "One entry per catalog plan. With `extract`, the first capture group is read as the native price; without it the page SHA-256 is fingerprinted.",
+  "entries": [
+    {
+      "platformKey": "netflix",
+      "planId": "mobile",
+      "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+      "extract": "Mobile</span>:\\s*([\\d,]+)\\s*PHP"
+    },
+    {
+      "platformKey": "netflix",
+      "planId": "basic",
+      "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+      "extract": "Basic</span>:\\s*([\\d,]+)\\s*PHP"
+    },
+    {
+      "platformKey": "netflix",
+      "planId": "standard",
+      "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+      "extract": "Standard</span>:\\s*([\\d,]+)\\s*PHP"
+    },
+    {
+      "platformKey": "netflix",
+      "planId": "premium",
+      "sourceUrl": "https://help.netflix.com/en/node/24926/ph",
+      "extract": "Premium</span>:\\s*([\\d,]+)\\s*PHP"
+    },
+    {
+      "platformKey": "spotify",
+      "planId": "individual",
+      "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+      "extract": "Individual[\\s\\S]{0,500}?₱([\\d,]+)\\s*/\\s*month after"
+    },
+    {
+      "platformKey": "spotify",
+      "planId": "student",
+      "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+      "extract": "Student[\\s\\S]{0,500}?₱([\\d,]+)\\s*/\\s*month after"
+    },
+    {
+      "platformKey": "spotify",
+      "planId": "duo",
+      "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+      "extract": "Duo[\\s\\S]{0,500}?₱([\\d,]+)\\s*/\\s*month after"
+    },
+    {
+      "platformKey": "spotify",
+      "planId": "family",
+      "sourceUrl": "https://www.spotify.com/ph-en/premium/",
+      "extract": "Family[\\s\\S]{0,500}?₱([\\d,]+)\\s*/\\s*month after"
+    },
+    {
+      "platformKey": "apple-music",
+      "planId": "individual",
+      "sourceUrl": "https://www.apple.com/ph/apple-music/",
+      "extract": "Individual[\\s\\S]{0,200}?₱([\\d,]+)/month"
+    },
+    {
+      "platformKey": "apple-music",
+      "planId": "family",
+      "sourceUrl": "https://www.apple.com/ph/apple-music/",
+      "extract": "Family[\\s\\S]{0,200}?₱([\\d,]+)/month"
+    },
+    {
+      "platformKey": "apple-music",
+      "planId": "student",
+      "sourceUrl": "https://www.apple.com/ph/apple-music/",
+      "extract": "Student[\\s\\S]{0,200}?₱([\\d,]+)/month"
+    },
+    {
+      "platformKey": "apple-tv",
+      "planId": "monthly",
+      "sourceUrl": "https://www.apple.com/ph/apple-tv/",
+      "extract": "₱([\\d,]+) per month after a free seven-day trial"
+    },
+    {
+      "platformKey": "icloud-plus",
+      "planId": "50gb",
+      "sourceUrl": "https://support.apple.com/en-ph/108047"
+    },
+    {
+      "platformKey": "icloud-plus",
+      "planId": "200gb",
+      "sourceUrl": "https://support.apple.com/en-ph/108047"
+    },
+    {
+      "platformKey": "icloud-plus",
+      "planId": "2tb",
+      "sourceUrl": "https://support.apple.com/en-ph/108047"
+    },
+    {
+      "platformKey": "microsoft-365",
+      "planId": "personal",
+      "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+      "extract": "Microsoft 365 Personal[\\s\\S]{0,120}?₱([\\d,.]+)/month"
+    },
+    {
+      "platformKey": "microsoft-365",
+      "planId": "personal-annual",
+      "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+      "extract": "Microsoft 365 Personal[\\s\\S]{0,160}?₱([\\d,.]+)/year"
+    },
+    {
+      "platformKey": "microsoft-365",
+      "planId": "family",
+      "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+      "extract": "Microsoft 365 Family[\\s\\S]{0,120}?₱([\\d,.]+)/month"
+    },
+    {
+      "platformKey": "microsoft-365",
+      "planId": "family-annual",
+      "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+      "extract": "Microsoft 365 Family[\\s\\S]{0,160}?₱([\\d,.]+)/year"
+    },
+    {
+      "platformKey": "microsoft-365",
+      "planId": "premium",
+      "sourceUrl": "https://www.microsoft.com/en-ph/microsoft-365/buy/compare-all-microsoft-365-products",
+      "extract": "Microsoft 365 Premium[\\s\\S]{0,120}?₱([\\d,.]+)/month"
+    },
+    {
+      "platformKey": "google-one",
+      "planId": "lite-30gb",
+      "sourceUrl": "https://one.google.com/about/plans?hl=en-PH&gl=PH",
+      "extract": "Lite[^<]{0,40}\\(30 GB\\)[\\s\\S]{0,150}?₱([\\d,]+)/mo"
+    },
+    {
+      "platformKey": "google-one",
+      "planId": "basic-100gb",
+      "sourceUrl": "https://one.google.com/about/plans?hl=en-PH&gl=PH",
+      "extract": "Basic[^<]{0,40}\\(100 GB\\)[\\s\\S]{0,150}?₱([\\d,]+)/mo"
+    },
+    {
+      "platformKey": "google-one",
+      "planId": "ai-pro-5tb",
+      "sourceUrl": "https://one.google.com/about/plans?hl=en-PH&gl=PH",
+      "extract": "Google AI Pro[^<]{0,40}\\(5 TB\\)[\\s\\S]{0,150}?₱([\\d,]+)/mo"
+    },
+    {
+      "platformKey": "disney-plus",
+      "planId": "standard",
+      "sourceUrl": "https://www.disneyplus.com/en-ph",
+      "extract": "Standard Plans are at ₱([\\d,]+)/month"
+    },
+    {
+      "platformKey": "disney-plus",
+      "planId": "standard-annual",
+      "sourceUrl": "https://www.disneyplus.com/en-ph",
+      "extract": "Standard Plans are at ₱[\\d,]+/month OR ₱([\\d,]+)/year"
+    },
+    {
+      "platformKey": "disney-plus",
+      "planId": "premium",
+      "sourceUrl": "https://www.disneyplus.com/en-ph",
+      "extract": "Premium Plans are at ₱([\\d,]+)/month"
+    },
+    {
+      "platformKey": "disney-plus",
+      "planId": "premium-annual",
+      "sourceUrl": "https://www.disneyplus.com/en-ph",
+      "extract": "Premium Plans are at ₱[\\d,]+/month OR ₱([\\d,]+)/year"
+    },
+    {
+      "platformKey": "hbo-max",
+      "planId": "standard-annual",
+      "sourceUrl": "https://www.hbomax.com/ph/en",
+      "extract": "\"periodicityText\":\"Yearly\"[\\s\\S]{0,2500}?\"plainText\":\"Standard\"\\}[\\s\\S]{0,1200}?\"originalPrice\":\\{[\\s\\S]{0,300}?\"plainText\":\"([\\d,.]+)\""
+    },
+    {
+      "platformKey": "hbo-max",
+      "planId": "premium-annual",
+      "sourceUrl": "https://www.hbomax.com/ph/en",
+      "extract": "\"periodicityText\":\"Yearly\"[\\s\\S]{0,10000}?\"plainText\":\"Premium\"\\}[\\s\\S]{0,1200}?\"originalPrice\":\\{[\\s\\S]{0,300}?\"plainText\":\"([\\d,.]+)\""
+    },
+    {
+      "platformKey": "prime-video",
+      "planId": "monthly",
+      "sourceUrl": "https://www.primevideo.com/",
+      "extract": "Starting from <strong>₱([\\d,]+)</strong>/month"
+    },
+    {
+      "platformKey": "prime-video",
+      "planId": "annual",
+      "sourceUrl": "https://www.primevideo.com/",
+      "extract": "Annual Plan at <strong>₱([\\d,]+)</strong>/year"
+    },
+    {
+      "platformKey": "youtube-premium",
+      "planId": "lite",
+      "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+      "extract": "\"text\":\"Premium Lite\"[\\s\\S]{0,600}?\"text\":\"₱([\\d,.]+)"
+    },
+    {
+      "platformKey": "youtube-premium",
+      "planId": "individual",
+      "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+      "extract": "\"text\":\"Individual\"[\\s\\S]{0,600}?\"text\":\"₱([\\d,.]+)"
+    },
+    {
+      "platformKey": "youtube-premium",
+      "planId": "family",
+      "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+      "extract": "\"text\":\"Family\"[\\s\\S]{0,600}?\"text\":\"₱([\\d,.]+)"
+    },
+    {
+      "platformKey": "youtube-premium",
+      "planId": "student",
+      "sourceUrl": "https://www.youtube.com/premium?gl=PH",
+      "extract": "\"text\":\"Student\"[\\s\\S]{0,600}?\"text\":\"₱([\\d,.]+)"
+    },
+    {
+      "platformKey": "apple-one",
+      "planId": "individual",
+      "sourceUrl": "https://www.apple.com/ph/apple-one/",
+      "extract": "Individual</h3>[\\s\\S]{0,300}?₱([\\d,]+)"
+    },
+    {
+      "platformKey": "apple-one",
+      "planId": "family",
+      "sourceUrl": "https://www.apple.com/ph/apple-one/",
+      "extract": "Family</h3>[\\s\\S]{0,300}?₱([\\d,]+)"
+    },
+    {
+      "platformKey": "claude",
+      "planId": "pro",
+      "sourceUrl": "https://claude.com/pricing",
+      "extract": "data-plan=\"pro_monthly\">\\$([\\d,.]+)</span>"
+    },
+    {
+      "platformKey": "chatgpt",
+      "planId": "plus",
+      "sourceUrl": "https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus",
+      "extract": "\\$([\\d,.]+)/month"
+    },
+    {
+      "platformKey": "notion",
+      "planId": "plus",
+      "sourceUrl": "https://www.notion.com/pricing",
+      "extract": ">Plus</h3>[\\s\\S]{0,200}?\\$([\\d,.]+)</span>"
+    },
+    {
+      "platformKey": "notion",
+      "planId": "business",
+      "sourceUrl": "https://www.notion.com/pricing",
+      "extract": ">Business<span[\\s\\S]{0,300}?\\$([\\d,.]+)</span>"
+    },
+    {
+      "platformKey": "dropbox",
+      "planId": "plus",
+      "sourceUrl": "https://www.dropbox.com/plans",
+      "extract": "\\$([\\d,.]+) / month"
+    },
+    {
+      "platformKey": "github-copilot",
+      "planId": "pro",
+      "sourceUrl": "https://github.com/features/copilot/plans",
+      "extract": "\"heading\":\"Pro\"[\\s\\S]{0,400}?\\$([\\d,.]+)"
+    },
+    {
+      "platformKey": "minecraft-realms",
+      "planId": "realms",
+      "sourceUrl": "https://www.minecraft.net/en-us/realms",
+      "extract": "\\$([\\d,.]+) USD [\\\\/]+ month[^\"]{0,60}Realms for Bedrock Edition"
+    },
+    {
+      "platformKey": "minecraft-realms",
+      "planId": "realms-plus",
+      "sourceUrl": "https://www.minecraft.net/en-us/realms",
+      "extract": "\\$([\\d,.]+) USD [\\\\/]+ month[^\"]{0,60}Realms Plus for Bedrock Edition"
+    },
+    {
+      "platformKey": "discord-nitro",
+      "planId": "nitro",
+      "sourceUrl": "https://discord.com/nitro",
+      "extract": "Nitro</div>[\\s\\S]{0,300}?\\$([\\d,.]+)"
+    },
+    {
+      "platformKey": "discord-nitro",
+      "planId": "nitro-basic",
+      "sourceUrl": "https://discord.com/nitro",
+      "extract": "Nitro Basic</div>[\\s\\S]{0,300}?\\$([\\d,.]+)"
+    }
+  ]
+}

@@ -1,0 +1,497 @@
+export const CADENCES = ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom'];
+export const STATUSES = ['active', 'trial', 'paused', 'canceled'];
+export const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'cash', 'other'];
+export const KIND_LABELS = { recurring: 'Recurring', one_time: 'One-time' };
+
+const KINDS = ['recurring', 'one_time'];
+const SOURCES = ['manual', 'catalog'];
+
+const DEFAULT_SETTINGS = {
+  currency: 'PHP',
+  timezone: 'Asia/Manila',
+  reminderDays: [7, 3, 1],
+};
+
+const MAX_NAME_LENGTH = 120;
+const MAX_NOTES_LENGTH = 2000;
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function trimString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function validIsoDate(value) {
+  if (typeof value !== 'string') return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
+}
+
+function normalizeDate(value, errors, field, label) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (validIsoDate(trimmed)) return trimmed;
+  }
+  errors[field] = `${label} must be a valid date (YYYY-MM-DD).`;
+  return null;
+}
+
+function slugifyMerchant(name) {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_NAME_LENGTH);
+  return slug || 'merchant';
+}
+
+function normalizeId(value, errors) {
+  if (value === undefined || value === null || value === '' || value === 0 || value === '0') return 0;
+  const id = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isInteger(id) || id < 1) {
+    errors.id = 'Id is not valid.';
+    return 0;
+  }
+  return id;
+}
+
+function toKey(value) {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const id = Number(value);
+    if (Number.isInteger(id) && id > 0) return id;
+  }
+  return null;
+}
+
+function throwIfErrors(errors) {
+  const fields = Object.keys(errors);
+  if (fields.length === 0) return;
+  const error = new Error(errors[fields[0]]);
+  error.errors = errors;
+  throw error;
+}
+
+export function validateSubscriptionInput(input) {
+  const errors = {};
+  const source = isPlainObject(input) ? input : {};
+  if (!isPlainObject(input)) errors.form = 'Subscription details are required.';
+
+  const rawKind = source.kind === undefined || source.kind === null || source.kind === ''
+    ? 'recurring'
+    : source.kind;
+  if (!KINDS.includes(rawKind)) errors.kind = 'Subscription type must be recurring or one_time.';
+  const kind = KINDS.includes(rawKind) ? rawKind : 'recurring';
+
+  const merchantName = trimString(source.merchantName);
+  if (!merchantName) {
+    errors.merchantName = 'Merchant name is required.';
+  } else if (merchantName.length > MAX_NAME_LENGTH) {
+    errors.merchantName = `Merchant name must be ${MAX_NAME_LENGTH} characters or fewer.`;
+  }
+
+  const merchantKey = trimString(source.merchantKey).slice(0, MAX_NAME_LENGTH)
+    || slugifyMerchant(merchantName);
+
+  const planId = source.planId === undefined || source.planId === null || source.planId === ''
+    ? null
+    : String(source.planId).trim() || null;
+
+  const planName = trimString(source.planName);
+  if (planName.length > MAX_NAME_LENGTH) {
+    errors.planName = `Plan name must be ${MAX_NAME_LENGTH} characters or fewer.`;
+  }
+
+  const rawAmount = typeof source.amountCents === 'string' && source.amountCents.trim()
+    ? Number(source.amountCents)
+    : source.amountCents;
+  if (!Number.isInteger(rawAmount) || rawAmount < 0) {
+    errors.amountCents = 'Amount must be a whole number of cents (0 or more).';
+  }
+  const amountCents = Number.isInteger(rawAmount) && rawAmount >= 0 ? rawAmount : 0;
+
+  let cadence = source.cadence === undefined || source.cadence === null || source.cadence === ''
+    ? null
+    : source.cadence;
+  let customIntervalDays = null;
+  if (kind === 'one_time') {
+    if (cadence !== null) errors.cadence = 'One-time payments cannot have a cadence.';
+    cadence = null;
+  } else if (cadence === null) {
+    errors.cadence = 'Choose a billing cadence.';
+  } else if (!CADENCES.includes(cadence)) {
+    errors.cadence = 'Billing cadence is not recognized.';
+  } else if (cadence === 'custom') {
+    const rawDays = typeof source.customIntervalDays === 'string' && source.customIntervalDays.trim()
+      ? Number(source.customIntervalDays)
+      : source.customIntervalDays;
+    if (!Number.isInteger(rawDays) || rawDays < 1) {
+      errors.customIntervalDays = 'Custom cadence needs a whole number of days (1 or more).';
+    } else {
+      customIntervalDays = rawDays;
+    }
+  }
+
+  const rawStatus = source.status === undefined || source.status === null || source.status === ''
+    ? 'active'
+    : source.status;
+  if (!STATUSES.includes(rawStatus)) errors.status = 'Status is not recognized.';
+  const status = STATUSES.includes(rawStatus) ? rawStatus : 'active';
+
+  const nextRenewalDate = normalizeDate(source.nextRenewalDate, errors, 'nextRenewalDate', 'Next renewal date');
+  const startedOn = normalizeDate(source.startedOn, errors, 'startedOn', 'Start date');
+  const lastChargeDate = normalizeDate(source.lastChargeDate, errors, 'lastChargeDate', 'Last charge date');
+
+  const notes = trimString(source.notes);
+  if (notes.length > MAX_NOTES_LENGTH) {
+    errors.notes = `Notes must be ${MAX_NOTES_LENGTH} characters or fewer.`;
+  }
+
+  let paymentMethodId = null;
+  if (source.paymentMethodId !== undefined && source.paymentMethodId !== null && source.paymentMethodId !== '') {
+    const rawId = typeof source.paymentMethodId === 'string' ? Number(source.paymentMethodId) : source.paymentMethodId;
+    if (Number.isInteger(rawId) && rawId > 0) {
+      paymentMethodId = rawId;
+    } else {
+      errors.paymentMethodId = 'Payment method is not valid.';
+    }
+  }
+
+  const rawSource = source.source === undefined || source.source === null || source.source === ''
+    ? 'manual'
+    : source.source;
+  const sourceKind = SOURCES.includes(rawSource) ? rawSource : 'manual';
+
+  const id = normalizeId(source.id, errors);
+
+  const data = {
+    kind,
+    merchantKey,
+    merchantName,
+    planId,
+    planName,
+    amountCents,
+    currency: 'PHP',
+    cadence,
+    customIntervalDays,
+    status,
+    nextRenewalDate,
+    startedOn,
+    lastChargeDate,
+    notes,
+    paymentMethodId,
+    source: sourceKind,
+  };
+  if (id) data.id = id;
+
+  return { errors, data };
+}
+
+function validatePaymentMethodInput(input) {
+  const errors = {};
+  const source = isPlainObject(input) ? input : {};
+  if (!isPlainObject(input)) errors.form = 'Payment method details are required.';
+
+  const label = trimString(source.label);
+  if (!label) {
+    errors.label = 'Label is required.';
+  } else if (label.length > MAX_NAME_LENGTH) {
+    errors.label = `Label must be ${MAX_NAME_LENGTH} characters or fewer.`;
+  }
+
+  const rawKind = source.kind === undefined || source.kind === null || source.kind === ''
+    ? 'other'
+    : source.kind;
+  if (!PAYMENT_KINDS.includes(rawKind)) errors.kind = 'Payment method type is not recognized.';
+  const kind = PAYMENT_KINDS.includes(rawKind) ? rawKind : 'other';
+
+  const last4 = trimString(source.last4);
+  if (last4.length > 4) errors.last4 = 'Last 4 must be 4 characters or fewer.';
+
+  const notes = trimString(source.notes);
+  if (notes.length > MAX_NOTES_LENGTH) {
+    errors.notes = `Notes must be ${MAX_NOTES_LENGTH} characters or fewer.`;
+  }
+
+  const id = normalizeId(source.id, errors);
+
+  const data = { label, kind, last4, notes };
+  if (id) data.id = id;
+
+  return { errors, data };
+}
+
+export async function listSubscriptions(db) {
+  const rows = await db.getAll('subscriptions');
+  return rows.sort(compareSubscriptions);
+}
+
+function compareSubscriptions(a, b) {
+  const dateA = validIsoDate(a.nextRenewalDate) ? a.nextRenewalDate : null;
+  const dateB = validIsoDate(b.nextRenewalDate) ? b.nextRenewalDate : null;
+  if (dateA !== dateB) {
+    if (dateA === null) return 1;
+    if (dateB === null) return -1;
+    return dateA < dateB ? -1 : 1;
+  }
+
+  const byName = String(a.merchantName || '').localeCompare(String(b.merchantName || ''));
+  if (byName !== 0) return byName;
+  return (a.id || 0) - (b.id || 0);
+}
+
+export async function getSubscription(db, id) {
+  const key = toKey(id);
+  if (key === null) return undefined;
+  return db.get('subscriptions', key);
+}
+
+export async function saveSubscription(db, input) {
+  const { errors, data } = validateSubscriptionInput(input);
+
+  if (!errors.paymentMethodId && data.paymentMethodId !== null) {
+    const method = await db.get('paymentMethods', data.paymentMethodId);
+    if (!method) errors.paymentMethodId = 'Payment method not found.';
+  }
+
+  throwIfErrors(errors);
+
+  const now = new Date().toISOString();
+  const id = data.id || 0;
+  const existing = id ? await db.get('subscriptions', id) : undefined;
+  const record = { ...data };
+  record.createdAt = existing && existing.createdAt ? existing.createdAt : now;
+  record.updatedAt = now;
+
+  if (id) record.id = id;
+  const key = await db.put('subscriptions', record);
+  if (!id) record.id = key;
+  return record;
+}
+
+export async function deleteSubscription(db, id) {
+  const key = toKey(id);
+  if (key === null) return false;
+  const existing = await db.get('subscriptions', key);
+  if (!existing) return false;
+  await db.delete('subscriptions', key);
+  return true;
+}
+
+export async function listPaymentMethods(db) {
+  return db.getAll('paymentMethods');
+}
+
+export async function savePaymentMethod(db, input) {
+  const { errors, data } = validatePaymentMethodInput(input);
+  throwIfErrors(errors);
+
+  const now = new Date().toISOString();
+  const id = data.id || 0;
+  const existing = id ? await db.get('paymentMethods', id) : undefined;
+  const record = { ...data };
+  record.createdAt = existing && existing.createdAt ? existing.createdAt : now;
+
+  if (id) record.id = id;
+  const key = await db.put('paymentMethods', record);
+  if (!id) record.id = key;
+  return record;
+}
+
+export async function deletePaymentMethod(db, id) {
+  const key = toKey(id);
+  if (key === null) return false;
+  const existing = await db.get('paymentMethods', key);
+  if (!existing) return false;
+
+  await db.delete('paymentMethods', key);
+
+  const now = new Date().toISOString();
+  const subscriptions = await db.getAll('subscriptions');
+  for (const subscription of subscriptions) {
+    if (subscription.paymentMethodId !== key) continue;
+    subscription.paymentMethodId = null;
+    subscription.updatedAt = now;
+    await db.put('subscriptions', subscription);
+  }
+  return true;
+}
+
+function sanitizeSettings(value, base) {
+  const source = isPlainObject(value) ? value : {};
+
+  const currency = typeof source.currency === 'string' && /^[A-Z]{3}$/.test(source.currency.trim().toUpperCase())
+    ? source.currency.trim().toUpperCase()
+    : base.currency;
+
+  const timezone = typeof source.timezone === 'string' && source.timezone.trim()
+    ? source.timezone.trim()
+    : base.timezone;
+
+  const reminderDays = Array.isArray(source.reminderDays)
+    ? [...new Set(source.reminderDays.filter((day) => Number.isInteger(day) && day >= 0))].sort((a, b) => a - b)
+    : [...base.reminderDays];
+
+  return { currency, timezone, reminderDays };
+}
+
+export async function getSettings(db) {
+  const record = await db.get('settings', 'profile');
+  return sanitizeSettings(record && record.value, DEFAULT_SETTINGS);
+}
+
+export async function saveSettings(db, patch) {
+  if (!isPlainObject(patch)) throw new Error('Settings must be an object.');
+
+  const current = await getSettings(db);
+  const next = { ...current };
+
+  if (patch.currency !== undefined) {
+    const currency = typeof patch.currency === 'string' ? patch.currency.trim().toUpperCase() : '';
+    if (currency !== 'PHP') throw new Error('Only PHP is supported.');
+    next.currency = 'PHP';
+  }
+
+  if (patch.timezone !== undefined) {
+    const timezone = typeof patch.timezone === 'string' ? patch.timezone.trim() : '';
+    if (!timezone) throw new Error('Timezone is required.');
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+    } catch {
+      throw new Error('Timezone is not recognized.');
+    }
+    next.timezone = timezone;
+  }
+
+  if (patch.reminderDays !== undefined) {
+    if (!Array.isArray(patch.reminderDays)) throw new Error('Reminder days must be a list of days.');
+    const days = [];
+    for (const day of patch.reminderDays) {
+      if (!Number.isInteger(day) || day < 0) {
+        throw new Error('Reminder days must be whole numbers of days (0 or more).');
+      }
+      days.push(day);
+    }
+    next.reminderDays = [...new Set(days)].sort((a, b) => a - b);
+  }
+
+  await db.put('settings', { key: 'profile', value: next });
+  return next;
+}
+
+function monthlyAmount(subscription) {
+  const amount = Number(subscription.amountCents);
+  if (!Number.isFinite(amount) || amount < 0) return 0;
+
+  switch (subscription.cadence) {
+    case 'weekly':
+      return (amount * 52) / 12;
+    case 'biweekly':
+      return (amount * 26) / 12;
+    case 'monthly':
+      return amount;
+    case 'quarterly':
+      return amount / 3;
+    case 'semiannual':
+      return amount / 6;
+    case 'annual':
+      return amount / 12;
+    case 'custom': {
+      const days = Number(subscription.customIntervalDays);
+      if (!Number.isInteger(days) || days < 1) return 0;
+      return (amount * (365 / days)) / 12;
+    }
+    default:
+      return 0;
+  }
+}
+
+function addDays(iso, days) {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+function localToday() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function reminderWindow(reminderDays) {
+  if (reminderDays === undefined || reminderDays === null) return DEFAULT_SETTINGS.reminderDays[0];
+  if (typeof reminderDays === 'number') {
+    return Number.isInteger(reminderDays) && reminderDays >= 0 ? reminderDays : 0;
+  }
+  if (Array.isArray(reminderDays)) {
+    const days = reminderDays.filter((day) => Number.isInteger(day) && day >= 0);
+    return days.length ? Math.max(...days) : 0;
+  }
+  return DEFAULT_SETTINGS.reminderDays[0];
+}
+
+export function summarize(subscriptions, options = {}) {
+  const settings = options || {};
+  const today = validIsoDate(settings.today) ? settings.today : localToday();
+  const horizon = addDays(today, reminderWindow(settings.reminderDays));
+  const rows = Array.isArray(subscriptions) ? subscriptions : [];
+
+  let monthlyCents = 0;
+  let yearlyCents = 0;
+  let activeCount = 0;
+  const dueSoon = [];
+  const overdue = [];
+  let next = null;
+
+  for (const subscription of rows) {
+    if (!subscription) continue;
+    if (subscription.status !== 'active' && subscription.status !== 'trial') continue;
+    activeCount += 1;
+
+    const date = validIsoDate(subscription.nextRenewalDate) ? subscription.nextRenewalDate : null;
+    if (date !== null) {
+      if (date < today) {
+        overdue.push(subscription);
+      } else if (date <= horizon) {
+        dueSoon.push(subscription);
+      }
+      if (date >= today && (next === null || compareSubscriptions(subscription, next) < 0)) {
+        next = subscription;
+      }
+    }
+
+    if (subscription.kind === 'recurring') {
+      const monthly = Math.round(monthlyAmount(subscription));
+      monthlyCents += monthly;
+      yearlyCents += monthly * 12;
+    }
+  }
+
+  dueSoon.sort(compareSubscriptions);
+  overdue.sort(compareSubscriptions);
+
+  return {
+    monthlyCents,
+    yearlyCents,
+    activeCount,
+    dueSoonCount: dueSoon.length,
+    overdueCount: overdue.length,
+    next,
+    dueSoon,
+    overdue,
+  };
+}

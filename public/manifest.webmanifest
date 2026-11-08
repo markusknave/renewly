@@ -3,7 +3,7 @@
   "name": "Renewly - Subscription Tracker",
   "short_name": "Renewly",
   "description": "Track every subscription, renewal, and real monthly cost in one place.",
-  "start_url": "/dashboard",
+  "start_url": "./",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
@@ -34,16 +34,16 @@
   ],
   "shortcuts": [
     {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "url": "/dashboard",
-      "icons": [{ "src": "/icons/app-192.png", "sizes": "192x192" }]
+      "name": "Subscriptions",
+      "short_name": "Subscriptions",
+      "url": "./#/",
+      "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Settings",
       "short_name": "Settings",
-      "url": "/settings",
-      "icons": [{ "src": "/icons/app-192.png", "sizes": "192x192" }]
+      "url": "./#/settings",
+      "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
     }
   ]
 }

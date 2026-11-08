@@ -1,17 +1,16 @@
 {
   "name": "renewly",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Self-hosted subscription renewal tracker with email/transaction ingestion",
+  "description": "Offline-first subscription tracker for Android and the web",
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "NODE_ENV=development node --watch src/server.js",
     "test": "node --test test/",
-    "check": "node --check src/server.js",
+    "serve": "node scripts/serve.mjs public",
+    "plans:refresh": "node scripts/refresh-plans.mjs",
     "icons": "node scripts/generate-icons.mjs",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
