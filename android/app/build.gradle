@@ -7,8 +7,8 @@ android {
         applicationId "com.renewly.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "0.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +16,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        beta {
+            // Stable beta key so every sideload APK upgrades in place. A fresh
+            // runner-generated debug key would make Android reject the update
+            // and force an uninstall, clearing app data.
+            storeFile file('../keystore/renewly-beta.p12')
+            storeType 'PKCS12'
+            storePassword 'renewly-beta'
+            keyAlias 'renewly-beta'
+            keyPassword 'renewly-beta'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.beta
+        }
         release {
+            signingConfig signingConfigs.beta
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

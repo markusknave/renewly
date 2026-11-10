@@ -1,5 +1,6 @@
 import { openDb } from './db.js';
 import * as store from './store.js';
+import * as notifications from './notifications.js';
 import { findPlan, findPlatform, loadCatalog } from './catalog.js';
 import {
 	CADENCE_LABELS,
@@ -14,6 +15,8 @@ const app = document.getElementById('app');
 const state = {
 	db: null,
 	subscriptions: [],
+	groups: [],
+	groupFilter: '',
 	methods: [],
 	settings: { currency: 'PHP', timezone: 'Asia/Manila', reminderDays: [7, 3, 1] },
 	catalog: null,
@@ -30,7 +33,7 @@ function parseRoute() {
 	if (!parts.length) return { name: 'dashboard' };
 	if (parts[0] === 'add') return { name: 'add', platformKey: parts[1] || '', planId: parts[2] || '' };
 	if (parts[0] === 'edit') return { name: 'edit', id: Number(parts[1]) };
-	if (parts[0] === 'catalog' || parts[0] === 'cards' || parts[0] === 'settings') {
+	if (parts[0] === 'catalog' || parts[0] === 'cards' || parts[0] === 'groups' || parts[0] === 'settings') {
 		return { name: parts[0] };
 	}
 	return { name: 'dashboard' };
@@ -61,8 +64,27 @@ function banner(flash) {
 
 async function reload() {
 	state.subscriptions = await store.listSubscriptions(state.db);
+	state.groups = await store.listGroups(state.db);
 	state.methods = await store.listPaymentMethods(state.db);
 	state.settings = await store.getSettings(state.db);
+	if (state.groupFilter && state.groupFilter !== 'none'
+		&& !state.groups.some((group) => String(group.id) === String(state.groupFilter))) {
+		state.groupFilter = '';
+	}
+	await syncReminders();
+}
+
+async function syncReminders(options = {}) {
+	try {
+		await notifications.syncReminders({
+			subscriptions: state.subscriptions,
+			reminderDays: state.settings.reminderDays,
+			today: today(),
+			request: Boolean(options.request),
+		});
+	} catch {
+		// Reminder scheduling must never block saving or rendering.
+	}
 }
 
 function today() {
@@ -76,17 +98,27 @@ async function render() {
 	state.flash = null;
 	setNav(route.name);
 	const iso = today();
+	const filtered =
+		route.name === 'dashboard' && state.groupFilter
+			? state.subscriptions.filter((sub) =>
+					state.groupFilter === 'none'
+						? !state.groups.some((group) => group.id === sub.groupId)
+						: String(sub.groupId) === String(state.groupFilter)
+				)
+			: state.subscriptions;
 	const summary =
 		route.name === 'dashboard'
-			? store.summarize(state.subscriptions, { today: iso, reminderDays: state.settings.reminderDays })
+			? store.summarize(filtered, { today: iso, reminderDays: state.settings.reminderDays })
 			: null;
 
 	let body = '';
 	if (route.name === 'dashboard') {
 		body = views.dashboardView({
-			subscriptions: state.subscriptions,
+			subscriptions: filtered,
 			summary,
 			methods: state.methods,
+			groups: state.groups,
+			groupFilter: state.groupFilter,
 			settings: state.settings,
 			today: iso,
 		});
@@ -107,17 +139,36 @@ async function render() {
 				}
 			}
 		}
-		body = views.formView({ sub: defaults, methods: state.methods, catalog: state.catalog, today: iso });
+		body = views.formView({
+			sub: defaults,
+			methods: state.methods,
+			groups: state.groups,
+			catalog: state.catalog,
+			today: iso,
+		});
 	} else if (route.name === 'edit') {
 		const sub = await store.getSubscription(state.db, route.id);
 		if (token !== renderToken) return;
 		body = sub
-			? views.formView({ sub, methods: state.methods, catalog: state.catalog, today: iso })
+			? views.formView({
+					sub,
+					methods: state.methods,
+					groups: state.groups,
+					catalog: state.catalog,
+					today: iso,
+				})
 			: views.missingView();
 	} else if (route.name === 'catalog') {
 		body = views.catalogView({ catalog: state.catalog, today: iso });
 	} else if (route.name === 'cards') {
 		body = views.cardsView({ methods: state.methods });
+	} else if (route.name === 'groups') {
+		body = views.groupsView({
+			groups: state.groups,
+			subscriptions: state.subscriptions,
+			methods: state.methods,
+			today: iso,
+		});
 	} else if (route.name === 'settings') {
 		body = views.settingsView({
 			settings: state.settings,
@@ -154,6 +205,7 @@ function filterCatalog() {
 }
 
 function maybeNotify(summary, iso) {
+	if (notifications.isNativeNotifications()) return;
 	if (!summary || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 	const due = [...summary.overdue, ...summary.dueSoon];
 	if (!due.length) return;
@@ -199,6 +251,7 @@ function subscriptionInput(form) {
 		lastChargeDate: null,
 		notes: String(fd.get('notes') || '').trim(),
 		paymentMethodId: readNumber(fd.get('paymentMethodId')),
+		groupId: readNumber(fd.get('groupId')),
 		source: platformKey ? 'catalog' : 'manual',
 	};
 }
@@ -224,12 +277,27 @@ async function onSubmit(event) {
 			await store.saveSubscription(state.db, subscriptionInput(form));
 			state.flash = { type: 'ok', message: 'Subscription saved' };
 			await reload();
+			if (state.notifyPermission === 'default') {
+				await syncReminders({ request: true });
+				state.notifyPermission = await notifications.permissionState();
+			}
 			location.hash = '#/';
 			return;
 		}
 		if (type === 'method') {
 			await store.savePaymentMethod(state.db, methodInput(form));
 			state.flash = { type: 'ok', message: 'Payment method saved' };
+			await reload();
+			await render();
+			return;
+		}
+		if (type === 'group') {
+			const fd = new FormData(form);
+			await store.saveGroup(state.db, {
+				id: form.dataset.id ? Number(form.dataset.id) : undefined,
+				name: String(fd.get('name') || '').trim(),
+			});
+			state.flash = { type: 'ok', message: form.dataset.id ? 'Group renamed' : 'Group created' };
 			await reload();
 			await render();
 			return;
@@ -271,12 +339,21 @@ async function deleteMethod(id) {
 	await render();
 }
 
+async function deleteGroup(id) {
+	if (!confirm('Delete this group? Its subscriptions will move to Ungrouped.')) return;
+	await store.deleteGroup(state.db, id);
+	state.flash = { type: 'ok', message: 'Group deleted' };
+	await reload();
+	await render();
+}
+
 async function exportData() {
 	const data = {
 		app: 'renewly',
-		version: 1,
+		version: 2,
 		exportedAt: new Date().toISOString(),
 		settings: state.settings,
+		groups: state.groups,
 		paymentMethods: state.methods,
 		subscriptions: state.subscriptions,
 	};
@@ -299,6 +376,7 @@ async function importData(file) {
 	if (!confirm('Replace all data on this device with the imported file?')) return;
 	await state.db.clear('subscriptions');
 	await state.db.clear('paymentMethods');
+	await state.db.clear('groups');
 	await state.db.clear('settings');
 	const idMap = new Map();
 	for (const method of parsed.paymentMethods || []) {
@@ -311,6 +389,16 @@ async function importData(file) {
 			createdAt: method.createdAt || new Date().toISOString(),
 		});
 		if (oldId !== undefined) idMap.set(oldId, Number(key));
+	}
+	const groupMap = new Map();
+	for (const group of parsed.groups || []) {
+		const oldId = group.id;
+		const key = await state.db.put('groups', {
+			name: String(group.name || 'Group').slice(0, 60),
+			createdAt: group.createdAt || new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+		});
+		if (oldId !== undefined) groupMap.set(oldId, Number(key));
 	}
 	for (const sub of parsed.subscriptions) {
 		const kind = sub.kind === 'one_time' ? 'one_time' : 'recurring';
@@ -330,6 +418,7 @@ async function importData(file) {
 			lastChargeDate: sub.lastChargeDate || null,
 			notes: String(sub.notes || '').slice(0, 2000),
 			paymentMethodId: sub.paymentMethodId != null ? idMap.get(sub.paymentMethodId) ?? null : null,
+			groupId: sub.groupId != null ? groupMap.get(sub.groupId) ?? null : null,
 			source: sub.source === 'catalog' ? 'catalog' : 'manual',
 			createdAt: sub.createdAt || new Date().toISOString(),
 			updatedAt: new Date().toISOString(),
@@ -350,10 +439,11 @@ async function importData(file) {
 }
 
 async function clearData() {
-	if (!confirm('Erase every subscription, payment method, and setting on this device?')) return;
+	if (!confirm('Erase every subscription, group, payment method, and setting on this device?')) return;
 	if (!confirm('This cannot be undone. Continue?')) return;
 	await state.db.clear('subscriptions');
 	await state.db.clear('paymentMethods');
+	await state.db.clear('groups');
 	await state.db.clear('settings');
 	state.flash = { type: 'ok', message: 'All data erased' };
 	await reload();
@@ -367,22 +457,22 @@ async function onClick(event) {
 		try {
 			if (action === 'delete-sub') await deleteSubscription(Number(trigger.dataset.id));
 			else if (action === 'delete-method') await deleteMethod(Number(trigger.dataset.id));
+			else if (action === 'delete-group') await deleteGroup(Number(trigger.dataset.id));
 			else if (action === 'export') await exportData();
 			else if (action === 'import') document.getElementById('import-file')?.click();
 			else if (action === 'clear-data') await clearData();
 			else if (action === 'enable-notifications') {
-				if (typeof Notification === 'undefined') {
-					state.flash = { type: 'error', message: 'Notifications are not supported here' };
-				} else {
-					state.notifyPermission = await Notification.requestPermission();
-					state.flash = {
-						type: state.notifyPermission === 'granted' ? 'ok' : 'error',
-						message:
-							state.notifyPermission === 'granted'
-								? 'Notifications enabled'
-								: 'Notifications were not granted',
-					};
-				}
+				state.notifyPermission = await notifications.requestPermission();
+				if (state.notifyPermission === 'granted') await syncReminders({ request: true });
+				state.flash = {
+					type: state.notifyPermission === 'granted' ? 'ok' : 'error',
+					message:
+						state.notifyPermission === 'granted'
+							? notifications.isNativeNotifications()
+								? 'Notifications enabled — reminders are scheduled on this device'
+								: 'Notifications enabled'
+							: 'Notifications were not granted',
+				};
 				await render();
 			}
 		} catch (err) {
@@ -396,6 +486,12 @@ async function onClick(event) {
 		for (const other of app.querySelectorAll('[data-catalog-filter]')) other.classList.remove('on');
 		chip.classList.add('on');
 		filterCatalog();
+		return;
+	}
+	const groupChip = event.target.closest('[data-group-filter]');
+	if (groupChip) {
+		state.groupFilter = groupChip.dataset.groupFilter;
+		await render();
 	}
 }
 
@@ -485,6 +581,18 @@ async function boot() {
 		state.catalog = null;
 	}
 	await reload();
+	state.notifyPermission = await notifications.permissionState();
+	if (
+		notifications.isNativeNotifications()
+		&& state.notifyPermission === 'default'
+		&& state.subscriptions.length
+	) {
+		await syncReminders({ request: true });
+		state.notifyPermission = await notifications.permissionState();
+	}
+	await notifications.listenForNotificationTaps((id) => {
+		if (Number.isInteger(id) && id > 0) location.hash = `#/edit/${id}`;
+	});
 	await render();
 	addEventListener('hashchange', () => render());
 	app.addEventListener('click', onClick);

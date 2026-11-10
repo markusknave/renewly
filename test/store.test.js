@@ -6,11 +6,16 @@ import {
   CADENCES,
   STATUSES,
   PAYMENT_KINDS,
+  PAYMENT_KIND_LABELS,
   KIND_LABELS,
   listSubscriptions,
   getSubscription,
   saveSubscription,
   deleteSubscription,
+  listGroups,
+  saveGroup,
+  deleteGroup,
+  summarizeGroups,
   listPaymentMethods,
   savePaymentMethod,
   deletePaymentMethod,
@@ -40,6 +45,13 @@ test('exports the contract constants', () => {
   assert.deepEqual(CADENCES, ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom']);
   assert.deepEqual(STATUSES, ['active', 'trial', 'paused', 'canceled']);
   assert.deepEqual(PAYMENT_KINDS, ['card', 'ewallet', 'bank', 'cash', 'other']);
+  assert.deepEqual(PAYMENT_KIND_LABELS, {
+    card: 'Card',
+    ewallet: 'E-wallet',
+    bank: 'Bank transfer',
+    cash: 'Cash',
+    other: 'Other',
+  });
   assert.deepEqual(KIND_LABELS, { recurring: 'Recurring', one_time: 'One-time' });
 });
 
@@ -184,6 +196,77 @@ test('saveSubscription rejects invalid records without writing', async () => {
   const error = await saveSubscription(db, subscriptionInput({ merchantName: '' })).catch((caught) => caught);
   assert.ok(error instanceof Error);
   assert.equal(error.errors.merchantName, 'Merchant name is required.');
+});
+
+test('groups persist, reject duplicates, and detach subscriptions on delete', async () => {
+  const db = createMemoryBackend();
+
+  const cars = await saveGroup(db, { name: '  Cars  ' });
+  assert.equal(cars.name, 'Cars');
+  assert.match(cars.createdAt, /^\d{4}-\d{2}-\d{2}T/);
+  await assert.rejects(() => saveGroup(db, { name: 'cars' }), /already exists/);
+  await assert.rejects(() => saveGroup(db, { name: '   ' }), /Group name is required/);
+
+  const home = await saveGroup(db, { name: 'Home' });
+  assert.deepEqual((await listGroups(db)).map((group) => group.name), ['Cars', 'Home']);
+
+  const subscription = await saveSubscription(db, subscriptionInput({ groupId: cars.id }));
+  assert.equal(subscription.groupId, cars.id);
+  await assert.rejects(
+    () => saveSubscription(db, subscriptionInput({ groupId: 999 })),
+    /Group not found/
+  );
+
+  const renamed = await saveGroup(db, { ...cars, name: 'Vehicles' });
+  assert.equal(renamed.id, cars.id);
+  assert.equal(renamed.name, 'Vehicles');
+  assert.equal(renamed.createdAt, cars.createdAt);
+
+  assert.equal(await deleteGroup(db, cars.id), true);
+  assert.equal((await getSubscription(db, subscription.id)).groupId, null);
+  assert.equal(await deleteGroup(db, cars.id), false);
+  assert.deepEqual((await listGroups(db)).map((group) => group.name), ['Home']);
+  assert.equal((await listGroups(db))[0].id, home.id);
+});
+
+test('summarizeGroups counts subscriptions and payment methods per group', async () => {
+  const db = createMemoryBackend();
+  const cars = await saveGroup(db, { name: 'Cars' });
+  const home = await saveGroup(db, { name: 'Home' });
+  const visa = await savePaymentMethod(db, { label: 'Visa', kind: 'card', last4: '4242' });
+  const gcash = await savePaymentMethod(db, { label: 'GCash', kind: 'ewallet' });
+
+  await saveSubscription(db, subscriptionInput({
+    merchantName: 'Toyota',
+    nextRenewalDate: '2026-11-20',
+    groupId: cars.id,
+    paymentMethodId: visa.id,
+  }));
+  await saveSubscription(db, subscriptionInput({
+    merchantName: 'Shell',
+    nextRenewalDate: '2026-11-21',
+    groupId: cars.id,
+    paymentMethodId: gcash.id,
+  }));
+  await saveSubscription(db, subscriptionInput({
+    merchantName: 'Netflix',
+    nextRenewalDate: '2026-11-22',
+    groupId: home.id,
+    paymentMethodId: visa.id,
+  }));
+  await saveSubscription(db, subscriptionInput({ merchantName: 'Unassigned', nextRenewalDate: '2026-11-23' }));
+
+  const summaries = summarizeGroups(await listGroups(db), await listSubscriptions(db));
+  const carSummary = summaries.find((group) => group.id === cars.id);
+  assert.equal(carSummary.subscriptionCount, 2);
+  assert.deepEqual(carSummary.methodCounts, [
+    { paymentMethodId: visa.id, count: 1 },
+    { paymentMethodId: gcash.id, count: 1 },
+  ]);
+
+  const homeSummary = summaries.find((group) => group.id === home.id);
+  assert.equal(homeSummary.subscriptionCount, 1);
+  assert.deepEqual(homeSummary.methodCounts, [{ paymentMethodId: visa.id, count: 1 }]);
 });
 
 test('payment methods persist and deleting one clears subscription references', async () => {

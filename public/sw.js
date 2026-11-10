@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renewly-shell-v3';
+const CACHE_NAME = 'renewly-shell-v4';
 const APP_ASSETS = [
 	'./',
 	'./index.html',
@@ -8,6 +8,8 @@ const APP_ASSETS = [
 	'./js/store.js',
 	'./js/db.js',
 	'./js/catalog.js',
+	'./js/notifications.js',
+	'./js/reminders.js',
 	'./js/lib/dates.js',
 	'./data/plans.json',
 	'./manifest.webmanifest',

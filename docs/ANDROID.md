@@ -78,7 +78,36 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 Or copy the APK to the phone, tap it, and allow **Install unknown apps** for the
 file manager.
 
-For a Play Store release, use Android Studio's **Generate Signed Bundle / APK**.
+`android/app/build.gradle` signs both debug and release builds with
+`android/keystore/renewly-beta.p12` (alias `renewly-beta`, password
+`renewly-beta`). That key is committed on purpose so every beta APK upgrades in
+place and keeps the WebView IndexedDB data. It is a beta-only key: do not use it
+for a Play Store release.
+
+### App updates and data
+
+- `public/js/db.js` opens IndexedDB version 2. The upgrade creates the `groups`
+  store and leaves existing subscriptions, payment methods, and settings alone.
+- Android updates an app in place when the package name, version code, and
+  signing key match. Version code 2 and the stable beta key guarantee that for
+  beta-0.2 and newer builds.
+- Sideloading a package signed by a different key fails with
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the only workaround is a one-time
+  uninstall, which erases app data. Export JSON first if you hit this with an
+  older build.
+
+### Notifications
+
+Renewly uses `@capacitor/local-notifications`. On first use (Settings →
+Notifications, first launch with existing subscriptions, or after saving a
+subscription) Android may ask for notification and alarm permissions. Once
+granted, the app schedules reminders through the alarm manager, so they fire
+while the app is closed and are restored after a reboot. Battery optimizations
+can still delay a notification on some vendors; allow Renewly to run without
+restrictions if reminders arrive late.
+
+The web/PWA build cannot schedule a background wake-up, so it only raises a
+notification while it is open.
 
 ### Option C - Build in the cloud
 
@@ -106,8 +135,9 @@ npm run icons
 
 - `usesCleartextTraffic="false"`, mixed content disabled, WebView debugging off.
 - `allowBackup="false"`, so the WebView database is not backed up by Android.
-- Data lives in the app's IndexedDB. Uninstalling the app or clearing storage
-  deletes it; use **Settings → Export JSON** first.
+- Data lives in the app's IndexedDB. Schema upgrades are additive, and beta APKs
+  share one signing key, so installing a newer beta keeps the database. Clearing
+  storage or uninstalling still deletes it; use **Settings → Export JSON** first.
 
 ## Troubleshooting
 
@@ -117,5 +147,7 @@ npm run icons
 | Old UI after an update | Fully close the app; bump `CACHE_NAME` in `public/sw.js`; rebuild the APK. |
 | Catalog is empty | Confirm `public/data/plans.json` exists and was copied by `android:sync`. |
 | Data disappeared | App storage was cleared or the APK was uninstalled. Restore from an exported JSON file. |
+| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-0.2, then import the JSON file. |
+| No notification when closed | Grant notification/alarm permission in Android settings and allow Renewly to run without battery restrictions. |
 | Build fails with missing SDK | Install Android SDK Platform 36 and Build-Tools in Android Studio. |
 | PWA install option missing | The page is not HTTPS or `localhost`. Use the APK or an HTTPS host. |

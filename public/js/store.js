@@ -1,7 +1,15 @@
 export const CADENCES = ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom'];
 export const STATUSES = ['active', 'trial', 'paused', 'canceled'];
 export const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'cash', 'other'];
+export const PAYMENT_KIND_LABELS = {
+  card: 'Card',
+  ewallet: 'E-wallet',
+  bank: 'Bank transfer',
+  cash: 'Cash',
+  other: 'Other',
+};
 export const KIND_LABELS = { recurring: 'Recurring', one_time: 'One-time' };
+export const UNGROUPED_LABEL = 'Ungrouped';
 
 const KINDS = ['recurring', 'one_time'];
 const SOURCES = ['manual', 'catalog'];
@@ -13,6 +21,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const MAX_NAME_LENGTH = 120;
+const MAX_GROUP_NAME_LENGTH = 60;
 const MAX_NOTES_LENGTH = 2000;
 
 function isPlainObject(value) {
@@ -171,6 +180,16 @@ export function validateSubscriptionInput(input) {
     }
   }
 
+  let groupId = null;
+  if (source.groupId !== undefined && source.groupId !== null && source.groupId !== '') {
+    const rawGroupId = typeof source.groupId === 'string' ? Number(source.groupId) : source.groupId;
+    if (Number.isInteger(rawGroupId) && rawGroupId > 0) {
+      groupId = rawGroupId;
+    } else {
+      errors.groupId = 'Group is not valid.';
+    }
+  }
+
   const rawSource = source.source === undefined || source.source === null || source.source === ''
     ? 'manual'
     : source.source;
@@ -194,12 +213,103 @@ export function validateSubscriptionInput(input) {
     lastChargeDate,
     notes,
     paymentMethodId,
+    groupId,
     source: sourceKind,
   };
   if (id) data.id = id;
 
   return { errors, data };
 }
+
+function validateGroupInput(input) {
+  const errors = {};
+  const source = isPlainObject(input) ? input : {};
+  if (!isPlainObject(input)) errors.form = 'Group details are required.';
+
+  const name = trimString(source.name);
+  if (!name) {
+    errors.name = 'Group name is required.';
+  } else if (name.length > MAX_GROUP_NAME_LENGTH) {
+    errors.name = `Group name must be ${MAX_GROUP_NAME_LENGTH} characters or fewer.`;
+  }
+
+  const id = normalizeId(source.id, errors);
+
+  const data = { name };
+  if (id) data.id = id;
+
+  return { errors, data };
+}
+
+export async function listGroups(db) {
+  const rows = await db.getAll('groups');
+  return rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')) || (a.id || 0) - (b.id || 0));
+}
+
+export async function saveGroup(db, input) {
+  const { errors, data } = validateGroupInput(input);
+  throwIfErrors(errors);
+
+  const groups = await db.getAll('groups');
+  const nameKey = data.name.toLocaleLowerCase();
+  const duplicate = groups.find(
+    (group) => group.id !== data.id && String(group.name || '').trim().toLocaleLowerCase() === nameKey
+  );
+  if (duplicate) throw new Error('A group with that name already exists.');
+
+  const now = new Date().toISOString();
+  const id = data.id || 0;
+  const existing = id ? await db.get('groups', id) : undefined;
+  if (id && !existing) throw new Error('Group not found.');
+  const record = { ...data };
+  record.createdAt = existing && existing.createdAt ? existing.createdAt : now;
+  record.updatedAt = now;
+
+  if (id) record.id = id;
+  const key = await db.put('groups', record);
+  if (!id) record.id = key;
+  return record;
+}
+
+export async function deleteGroup(db, id) {
+  const key = toKey(id);
+  if (key === null) return false;
+  const existing = await db.get('groups', key);
+  if (!existing) return false;
+  await db.delete('groups', key);
+
+  const now = new Date().toISOString();
+  const subscriptions = await db.getAll('subscriptions');
+  for (const subscription of subscriptions) {
+    if (subscription.groupId !== key) continue;
+    subscription.groupId = null;
+    subscription.updatedAt = now;
+    await db.put('subscriptions', subscription);
+  }
+  return true;
+}
+
+// Groups the subscriptions for the Groups screen and counts which payment
+// method pays which subscriptions in each group.
+export function summarizeGroups(groups, subscriptions) {
+  const rows = Array.isArray(subscriptions) ? subscriptions : [];
+  const groupsList = Array.isArray(groups) ? groups : [];
+  return groupsList.map((group) => {
+    const items = rows.filter((subscription) => subscription && subscription.groupId === group.id);
+    const counts = new Map();
+    for (const subscription of items) {
+      const methodId = subscription.paymentMethodId ?? null;
+      counts.set(methodId, (counts.get(methodId) || 0) + 1);
+    }
+    return {
+      ...group,
+      subscriptions: items,
+      subscriptionCount: items.length,
+      methodCounts: [...counts.entries()].map(([paymentMethodId, count]) => ({ paymentMethodId, count })),
+    };
+  });
+}
+
 
 function validatePaymentMethodInput(input) {
   const errors = {};
@@ -266,6 +376,10 @@ export async function saveSubscription(db, input) {
   if (!errors.paymentMethodId && data.paymentMethodId !== null) {
     const method = await db.get('paymentMethods', data.paymentMethodId);
     if (!method) errors.paymentMethodId = 'Payment method not found.';
+  }
+  if (!errors.groupId && data.groupId !== null) {
+    const group = await db.get('groups', data.groupId);
+    if (!group) errors.groupId = 'Group not found.';
   }
 
   throwIfErrors(errors);

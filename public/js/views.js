@@ -1,5 +1,6 @@
 import { CADENCE_LABELS, formatDateHuman, formatMoney } from './lib/dates.js';
 import { catalogCategories } from './catalog.js';
+import { PAYMENT_KIND_LABELS, summarizeGroups, UNGROUPED_LABEL } from './store.js';
 
 const STATUS_LABELS = {
 	active: 'Active',
@@ -84,7 +85,22 @@ function costLabel(sub) {
 function methodLabel(methods, id) {
 	const found = methods.find((m) => m.id === id);
 	if (!found) return '<span class="muted">—</span>';
-	return `${esc(found.label)}<span class="sub">${esc(found.last4 ? `•••• ${found.last4}` : found.kind)}</span>`;
+	const kind = PAYMENT_KIND_LABELS[found.kind] || found.kind || 'Other';
+	return `${esc(found.label)}<span class="sub">${esc(
+		found.last4 ? `•••• ${found.last4}` : kind
+	)}</span>`;
+}
+
+function groupName(groups, id) {
+	const found = groups.find((group) => group.id === id);
+	return found ? found.name : UNGROUPED_LABEL;
+}
+
+function subscriptionSub(sub, groups) {
+	const plan = sub.planName || (sub.kind === 'one_time' ? 'One-time' : 'No plan');
+	return groups.some((group) => group.id === sub.groupId)
+		? `${plan} · ${groupName(groups, sub.groupId)}`
+		: plan;
 }
 
 function summaryCards(summary, settings) {
@@ -135,12 +151,32 @@ function dueSection(summary, today) {
 	</section>`;
 }
 
-function subscriptionRows(subscriptions, methods, today) {
+function groupFilterBar(groups, groupFilter, subscriptions) {
+	const hasUngrouped = subscriptions.some((sub) => !groups.some((group) => group.id === sub.groupId));
+	if (!groups.length && !hasUngrouped) return '';
+	const all = `<button class="chip${!groupFilter ? ' on' : ''}" type="button" data-group-filter="">All groups</button>`;
+	const chips = groups.map(
+		(group) =>
+			`<button class="chip${String(groupFilter) === String(group.id) ? ' on' : ''}" type="button" data-group-filter="${group.id}">${esc(
+				group.name
+			)}</button>`
+	);
+	if (hasUngrouped) {
+		chips.push(
+			`<button class="chip${groupFilter === 'none' ? ' on' : ''}" type="button" data-group-filter="none">${esc(
+				UNGROUPED_LABEL
+			)}</button>`
+		);
+	}
+	return `<div class="toolbar group-filter" role="group" aria-label="Filter by group">${all}${chips.join('')}</div>`;
+}
+
+function subscriptionRows(subscriptions, methods, today, groups = []) {
 	return subscriptions
 		.map(
 			(s) => `<tr>
 				<td><span class="merchant">${avatar(s.merchantName)}<span>${esc(s.merchantName)}<span class="sub">${esc(
-					s.planName || (s.kind === 'one_time' ? 'One-time' : 'No plan')
+					subscriptionSub(s, groups)
 				)}</span></span></span></td>
 				<td class="num">${costLabel(s)}</td>
 				<td>${dateLabel(s, today)}</td>
@@ -157,7 +193,7 @@ function subscriptionRows(subscriptions, methods, today) {
 		.join('');
 }
 
-export function dashboardView({ subscriptions, summary, methods, settings, today }) {
+export function dashboardView({ subscriptions, summary, methods, groups = [], groupFilter = '', settings, today }) {
 	const active = subscriptions.filter((s) => s.status !== 'canceled');
 	const canceled = subscriptions.filter((s) => s.status === 'canceled');
 	return `<div class="page-head">
@@ -169,6 +205,7 @@ export function dashboardView({ subscriptions, summary, methods, settings, today
 			<a class="btn btn-primary" href="#/add">Add subscription</a>
 		</div>
 	</div>
+	${groupFilterBar(groups, groupFilter, subscriptions)}
 	${summaryCards(summary, settings)}
 	${dueSection(summary, today)}
 	<section class="panel">
@@ -180,7 +217,7 @@ export function dashboardView({ subscriptions, summary, methods, settings, today
 			active.length
 				? `<div class="table-wrap"><table class="subs-table">
 					<thead><tr><th>Service</th><th>Cost</th><th>Next</th><th>Paid with</th><th>Status</th><th></th></tr></thead>
-					<tbody>${subscriptionRows(active, methods, today)}</tbody>
+					<tbody>${subscriptionRows(active, methods, today, groups)}</tbody>
 				</table></div>`
 				: `<div class="empty">
 					<h3>No subscriptions yet</h3>
@@ -196,7 +233,8 @@ export function dashboardView({ subscriptions, summary, methods, settings, today
 				<div class="table-wrap"><table class="subs-table"><tbody>${subscriptionRows(
 					canceled,
 					methods,
-					today
+					today,
+					groups
 				)}</tbody></table></div>
 			</details></section>`
 			: ''
@@ -212,9 +250,11 @@ function platformOptions(catalog, selected) {
 		groups.get(category).push(p);
 	}
 	const parts = [`<option value=""${selected ? '' : ' selected'}>Other / manual entry</option>`];
-	for (const [category, items] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+	for (const [category, items] of [...groups.entries()].sort((a, b) =>
+		categoryLabel(a[0]).localeCompare(categoryLabel(b[0]))
+	)) {
 		parts.push(
-			`<optgroup label="${esc(category)}">${items
+			`<optgroup label="${esc(categoryLabel(category))}">${items
 				.map(
 					(p) =>
 						`<option value="${esc(p.key)}"${p.key === selected ? ' selected' : ''}>${esc(p.name)}</option>`
@@ -238,7 +278,7 @@ function planOptions(platform, selected) {
 	].join('');
 }
 
-export function formView({ sub, methods, catalog, today }) {
+export function formView({ sub, methods, groups = [], catalog, today }) {
 	const s = {
 		id: null,
 		kind: 'recurring',
@@ -254,6 +294,7 @@ export function formView({ sub, methods, catalog, today }) {
 		startedOn: '',
 		notes: '',
 		paymentMethodId: '',
+		groupId: '',
 		...(sub || {}),
 	};
 	const platform = catalog?.platforms?.find((p) => p.key === s.merchantKey) || null;
@@ -338,6 +379,20 @@ export function formView({ sub, methods, catalog, today }) {
 				<label>Status
 					<select name="status">${options(['active', 'trial', 'paused', 'canceled'], s.status || 'active', STATUS_LABELS)}</select>
 				</label>
+				<label>Group
+					<select name="groupId">
+						<option value="">${esc(UNGROUPED_LABEL)}</option>
+						${groups
+							.map(
+								(group) =>
+									`<option value="${group.id}"${
+										Number(s.groupId) === group.id ? ' selected' : ''
+									}>${esc(group.name)}</option>`
+							)
+							.join('')}
+					</select>
+					<span class="hint">Create groups on the Groups tab.</span>
+				</label>
 			</div>
 			<label>Notes
 				<textarea name="notes" rows="2" maxlength="2000">${esc(s.notes || '')}</textarea>
@@ -421,7 +476,8 @@ export function cardsView({ methods }) {
 				<label>Label<input type="text" name="label" maxlength="80" required value="${esc(m.label)}" /></label>
 				<label>Type<select name="kind">${options(
 					['card', 'ewallet', 'bank', 'cash', 'other'],
-					m.kind || 'card'
+					m.kind || 'card',
+					PAYMENT_KIND_LABELS
 				)}</select></label>
 				<label>Last 4<input type="text" name="last4" inputmode="numeric" maxlength="4" value="${esc(
 					m.last4 || ''
@@ -439,7 +495,11 @@ export function cardsView({ methods }) {
 		<div class="panel-head"><h2>Add a method</h2></div>
 		<form class="grid-4" data-form="method">
 			<label>Label<input type="text" name="label" maxlength="80" required placeholder="BPI Visa" /></label>
-			<label>Type<select name="kind">${options(['card', 'ewallet', 'bank', 'cash', 'other'], 'card')}</select></label>
+			<label>Type<select name="kind">${options(
+				['card', 'ewallet', 'bank', 'cash', 'other'],
+				'card',
+				PAYMENT_KIND_LABELS
+			)}</select></label>
 			<label>Last 4<input type="text" name="last4" inputmode="numeric" maxlength="4" placeholder="1234" /></label>
 			<label>Notes<input type="text" name="notes" maxlength="200" /></label>
 			<div class="form-actions"><button class="btn btn-primary" type="submit">Add</button></div>
@@ -452,6 +512,97 @@ export function cardsView({ methods }) {
 			'<p class="muted small">No payment methods yet. Add one to label which card or e-wallet pays each subscription.</p>'
 		}
 	</section>`;
+}
+
+function methodBreakdown(methodCounts, methods, subscriptions) {
+	if (!methodCounts.length) return '<p class="muted small">No subscriptions in this group yet.</p>';
+	return `<div class="group-methods" aria-label="Payment methods used in this group">${methodCounts
+		.map(({ paymentMethodId, count }) => {
+			const method = methods.find((m) => m.id === paymentMethodId);
+			const label = method ? method.label : 'No payment method';
+			const detail = method?.last4
+				? ` ···· ${method.last4}`
+				: method
+					? ` · ${PAYMENT_KIND_LABELS[method.kind] || method.kind}`
+					: '';
+			const names = subscriptions
+				.filter((sub) => (sub.paymentMethodId ?? null) === paymentMethodId)
+				.map((sub) => sub.merchantName)
+				.join(', ');
+			return `<span class="pill pill-group" title="${esc(names)}">${esc(label + detail)} <span class="count">${count}</span></span>`;
+		})
+		.join('')}</div>`;
+}
+
+export function groupsView({ groups, subscriptions, methods, today }) {
+	const summaries = summarizeGroups(groups, subscriptions);
+	const ungrouped = subscriptions.filter((sub) => !groups.some((group) => group.id === sub.groupId));
+	const panels = summaries
+		.map(
+			(group) => `<section class="panel">
+				<div class="panel-head group-head">
+					<form class="group-rename" data-form="group" data-id="${group.id}">
+						<input type="text" name="name" maxlength="60" required aria-label="Group name" value="${esc(
+							group.name
+						)}" />
+						<button class="btn btn-small" type="submit">Rename</button>
+					</form>
+					<div class="actions">
+						<span class="muted small">${group.subscriptionCount} subscription${
+							group.subscriptionCount === 1 ? '' : 's'
+						}</span>
+						<button class="link danger" type="button" data-action="delete-group" data-id="${group.id}">Delete</button>
+					</div>
+				</div>
+				<div class="group-methods-wrap">
+					<span class="muted small">Paid with</span>
+					${methodBreakdown(group.methodCounts, methods, group.subscriptions)}
+				</div>
+				${
+					group.subscriptionCount
+						? `<div class="table-wrap"><table class="subs-table">
+							<thead><tr><th>Service</th><th>Cost</th><th>Next</th><th>Paid with</th><th>Status</th><th></th></tr></thead>
+							<tbody>${subscriptionRows(group.subscriptions, methods, today, groups)}</tbody>
+						</table></div>`
+						: '<p class="muted small">No subscriptions assigned. Edit a subscription and pick this group.</p>'
+				}
+			</section>`
+		)
+		.join('');
+	const ungroupedPanel = ungrouped.length
+		? `<section class="panel">
+				<div class="panel-head"><h2>${esc(UNGROUPED_LABEL)}</h2><span class="muted small">${ungrouped.length} subscription${
+					ungrouped.length === 1 ? '' : 's'
+				}</span></div>
+				<div class="table-wrap"><table class="subs-table"><tbody>${subscriptionRows(
+					ungrouped,
+					methods,
+					today,
+					groups
+				)}</tbody></table></div>
+			</section>`
+		: '';
+	return `<div class="page-head">
+		<div>
+			<h1>Groups</h1>
+			<p class="muted">Split subscriptions into lists such as Cars, Home, or Family, and see which payment method pays what.</p>
+		</div>
+	</div>
+	<section class="panel">
+		<div class="panel-head"><h2>New group</h2></div>
+		<form class="grid-4" data-form="group">
+			<label>Group name<input type="text" name="name" maxlength="60" required placeholder="Cars" /></label>
+			<div class="form-actions"><button class="btn btn-primary" type="submit">Create group</button></div>
+		</form>
+		<p class="hint">Group names are stored on this device. Delete a group to keep its subscriptions and move them to ${esc(
+			UNGROUPED_LABEL
+		)}.</p>
+	</section>
+	${
+		panels ||
+		`<section class="panel"><div class="empty"><h3>No groups yet</h3><p class="muted">Create a group like Cars, then assign subscriptions to it from the subscription form.</p></div></section>`
+	}
+	${ungroupedPanel}`;
 }
 
 export function settingsView({ settings, catalog, stats, notifyPermission, subscriptionCount }) {
@@ -480,12 +631,12 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 	</section>
 	<section class="panel">
 		<div class="panel-head"><h2>Notifications</h2></div>
-		<p class="muted small">Renewly can raise a local notification when you open it and something is due. Phones do not allow a web app to wake itself in the background.</p>
+		<p class="muted small">On Android, Renewly schedules local reminders for each renewal and they fire even when the app is closed. On the web, notifications only fire while Renewly is open. Reminder timing comes from the reminder days above.</p>
 		<button class="btn" type="button" data-action="enable-notifications">${
 			notifyPermission === 'granted'
 				? 'Notifications enabled'
 				: notifyPermission === 'denied'
-					? 'Notifications blocked in browser settings'
+					? 'Notifications blocked in settings'
 					: notifyPermission === 'unsupported'
 						? 'Notifications not supported here'
 						: 'Enable notifications'

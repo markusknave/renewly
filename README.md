@@ -6,33 +6,47 @@ the device. Renewly shows what each subscription really costs per month/year and
 what is renewing or expiring next.
 
 - Recurring subscriptions and one-time deals that expire
+- Custom groups such as Cars or Home, with a payment-method breakdown per group
 - Monthly/yearly normalization, due-soon and overdue lists
 - Plan catalog for mainstream platforms with Philippine prices, source links, and
   verification dates
 - A payment-method label per subscription
+- Scheduled Android notifications that fire even when the app is closed
 - Installable PWA and a Capacitor Android shell that bundles the app
-- Zero runtime dependencies (the web app is plain ES modules)
+- Zero runtime web dependencies (the web app is plain ES modules)
 
 ## Download
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-0.1](https://github.com/markusknave/renewly/releases/tag/beta-0.1), and its
+[beta-0.2](https://github.com/markusknave/renewly/releases/tag/beta-0.2), and its
 only release asset is the installable APK:
 
 ```text
-renewly-beta-0.1.apk
+renewly-beta-0.2.apk
 ```
 
 Download it on the phone, tap it, and allow **Install unknown apps** for the
-browser or file manager. The build is debug-signed, so it installs without the
+browser or file manager. The build is beta-signed, so it installs without the
 Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 To install with `adb` instead:
 
 ```bash
-adb install -r renewly-beta-0.1.apk
+adb install -r renewly-beta-0.2.apk
 ```
+
+### Updating from beta-0.1
+
+> Installing beta-0.2 over an existing beta install keeps the IndexedDB
+> database: the version 2 upgrade only adds a groups store. Every beta-0.2 and
+> newer APK is signed with the same bundled beta key, so future updates also
+> install in place.
+>
+> beta-0.1 CI builds used a runner-generated debug key. If Android rejects the
+> install with a signature mismatch, export your data first, uninstall beta-0.1
+> once, then install beta-0.2 and import the JSON backup. From beta-0.2 onward
+> this one-time step is not needed.
 
 ## What changed from v1
 
@@ -43,8 +57,10 @@ app:
 
 - No auth, sessions, CSRF, cookies, database server, or webhooks
 - Manual entry (or catalog-assisted entry) is the only ingestion path
-- Reminders are computed on the device; the app cannot wake itself in the
-  background, so a notification is raised when you open it and something is due
+- Groups organize subscriptions into local lists such as Cars, with a count of
+  which payment method pays which subscriptions in each list
+- Android reminders are scheduled locally with the notification plugin, so they
+  fire while the app is closed; the web build still only notifies while open
 - Data moves with Export/Import JSON instead of a server
 
 ## Run it locally
@@ -111,32 +127,55 @@ reports when a page changes so you can re-verify the price by hand.
 
 ## Data and privacy
 
-- Storage: IndexedDB database `renewly` (stores `subscriptions`,
-  `paymentMethods`, `settings`).
+- Storage: IndexedDB database `renewly` (stores `subscriptions`, `groups`,
+  `paymentMethods`, `settings`). Schema version 2 adds `groups` without touching
+  existing records.
+- App updates keep the database. The APK is signed with the same bundled beta
+  key for every beta-0.2+ build, so Android upgrades the app in place.
 - No network requests except opening a catalog source link you tap.
 - Export produces a plain JSON file; Import replaces all data on the device.
 - Erasing site data, clearing app storage, or uninstalling the APK deletes the
   database. Export first if you care about it.
 
+## Notifications
+
+- Android schedules one local notification per subscription per reminder day,
+  at 09:00 device-local time. Schedules use Android's alarm manager with
+  `allowWhileIdle`, so they fire even when Renewly is closed, and the plugin
+  restores pending notifications after a reboot.
+- Grant the notification permission from **Settings → Notifications** in the
+  app. Android 13+ also asks for notification permission on first use; Android
+  12+ may ask for alarm permission depending on the device.
+- Reminders are rescheduled whenever subscriptions or settings change and on
+  app launch. A long-closed app cannot know about data that changed elsewhere,
+  because there is no server.
+- The web/PWA build cannot wake itself in the background; notifications there
+  only fire while the tab or installed PWA is open.
+
 ## Limits
 
 - No email, bank, or Plaid ingestion by design.
-- Notifications only fire while the app is open; there is no background worker.
+- Web notifications only fire while the app is open; use the Android APK for
+  closed-app reminders.
 - Catalog prices are point-in-time snapshots and vary by region, plan, and
   promotions. Always confirm on the platform before paying.
 - The web app needs a modern browser with IndexedDB. Private browsing may block
   storage.
+- The bundled beta signing key is for sideload builds only. Use a private key
+  from CI secrets or Play App Signing before publishing to a store.
 
 ## Project layout
 
 ```text
 public/
   index.html             app shell
-  js/app.js              router, actions, import/export, notifications
-  js/views.js            dashboard, form, catalog, cards, settings
+  js/app.js              router, actions, import/export, notification sync
+  js/views.js            dashboard, form, groups, catalog, cards, settings
   js/db.js               IndexedDB backend + in-memory backend for tests
-  js/store.js            validation, CRUD, settings, summary math
+  js/store.js            validation, CRUD, groups, settings, summary math
   js/catalog.js          bundled catalog loader
+  js/reminders.js        reminder occurrence computation
+  js/notifications.js    Capacitor local-notification bridge
   js/lib/dates.js        date, money, and cadence helpers
   data/plans.json        PH plan catalog
   sw.js                  offline shell cache

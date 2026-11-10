@@ -1002,6 +1002,60 @@ details > summary::-webkit-details-marker {
   align-self: end;
 }
 
+.group-filter {
+  margin-top: 0.2rem;
+}
+
+.group-head {
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.group-rename {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.group-rename input {
+  flex: 1 1 120px;
+  max-width: 280px;
+}
+
+.group-methods-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.15rem 0 0.9rem;
+}
+
+.group-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pill-group {
+  background: var(--bg-soft);
+  color: var(--fg);
+  border-color: var(--line);
+  font-weight: 600;
+}
+
+.pill-group .count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.2rem;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-text);
+  font-size: 0.68rem;
+}
+
 @media (max-width: 640px) {
   .topbar {
     flex-wrap: wrap;

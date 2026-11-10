@@ -1,7 +1,10 @@
-const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
+// Version 2 adds `groups`. upgradeDatabase only creates missing stores, so
+// existing subscriptions, payment methods, and settings survive the update.
 const STORE_CONFIG = {
   subscriptions: { keyPath: 'id', autoIncrement: true },
+  groups: { keyPath: 'id', autoIncrement: true },
   paymentMethods: { keyPath: 'id', autoIncrement: true },
   settings: { keyPath: 'key', autoIncrement: false },
 };

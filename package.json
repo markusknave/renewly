@@ -1,6 +1,6 @@
 {
   "name": "renewly",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Offline-first subscription tracker for Android and the web",
@@ -20,5 +20,8 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/cli": "^8.6.0",
     "@capacitor/core": "^8.6.0"
+  },
+  "dependencies": {
+    "@capacitor/local-notifications": "8.3.1"
   }
 }
