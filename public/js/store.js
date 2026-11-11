@@ -20,8 +20,12 @@ const DEFAULT_SETTINGS = {
   reminderDays: [7, 3, 1],
 };
 
+// Subscription and group names are capped at 25 characters: longer labels
+// overflow the row, group chip, and group header layouts.
+export const MAX_DISPLAY_NAME = 25;
+export const MAX_GROUP_NAME_LENGTH = 25;
+export const MAX_METHOD_LABEL_LENGTH = 60;
 const MAX_NAME_LENGTH = 120;
-const MAX_GROUP_NAME_LENGTH = 60;
 const MAX_NOTES_LENGTH = 2000;
 
 function isPlainObject(value) {
@@ -109,8 +113,8 @@ export function validateSubscriptionInput(input) {
   const merchantName = trimString(source.merchantName);
   if (!merchantName) {
     errors.merchantName = 'Merchant name is required.';
-  } else if (merchantName.length > MAX_NAME_LENGTH) {
-    errors.merchantName = `Merchant name must be ${MAX_NAME_LENGTH} characters or fewer.`;
+  } else if (merchantName.length > MAX_DISPLAY_NAME) {
+    errors.merchantName = `Subscription name must be ${MAX_DISPLAY_NAME} characters or fewer.`;
   }
 
   const merchantKey = trimString(source.merchantKey).slice(0, MAX_NAME_LENGTH)
@@ -190,6 +194,13 @@ export function validateSubscriptionInput(input) {
     }
   }
 
+  // Optional owner label: empty means "mine", a name means this record tracks
+  // somebody else's subscription of the same type.
+  const trackedFor = trimString(source.trackedFor);
+  if (trackedFor.length > MAX_DISPLAY_NAME) {
+    errors.trackedFor = `Tracked-for name must be ${MAX_DISPLAY_NAME} characters or fewer.`;
+  }
+
   const rawSource = source.source === undefined || source.source === null || source.source === ''
     ? 'manual'
     : source.source;
@@ -214,6 +225,7 @@ export function validateSubscriptionInput(input) {
     notes,
     paymentMethodId,
     groupId,
+    trackedFor: trackedFor || null,
     source: sourceKind,
   };
   if (id) data.id = id;
@@ -239,6 +251,36 @@ function validateGroupInput(input) {
   if (id) data.id = id;
 
   return { errors, data };
+}
+
+function identityPart(value) {
+  return String(value ?? '')
+    .trim()
+    .toLocaleLowerCase();
+}
+
+// Two subscriptions are the same tracked item when they name the same service,
+// the same plan, and the same owner ("tracked for" person or group).
+export function subscriptionIdentity(subscription) {
+  const source = isPlainObject(subscription) ? subscription : {};
+  const merchant = identityPart(source.merchantKey || source.merchantName);
+  const plan = identityPart(source.planId || source.planName);
+  const owner = identityPart(source.trackedFor);
+  return `${merchant}|${plan}|${owner}`;
+}
+
+export function findDuplicateSubscription(subscriptions, candidate) {
+  const rows = Array.isArray(subscriptions) ? subscriptions : [];
+  const target = subscriptionIdentity(candidate);
+  const candidateId = Number(candidate?.id) || 0;
+  return (
+    rows.find(
+      (row) =>
+        row &&
+        (Number(row.id) || 0) !== candidateId &&
+        subscriptionIdentity(row) === target
+    ) || null
+  );
 }
 
 export async function listGroups(db) {
@@ -319,8 +361,8 @@ function validatePaymentMethodInput(input) {
   const label = trimString(source.label);
   if (!label) {
     errors.label = 'Label is required.';
-  } else if (label.length > MAX_NAME_LENGTH) {
-    errors.label = `Label must be ${MAX_NAME_LENGTH} characters or fewer.`;
+  } else if (label.length > MAX_METHOD_LABEL_LENGTH) {
+    errors.label = `Label must be ${MAX_METHOD_LABEL_LENGTH} characters or fewer.`;
   }
 
   const rawKind = source.kind === undefined || source.kind === null || source.kind === ''
@@ -380,6 +422,18 @@ export async function saveSubscription(db, input) {
   if (!errors.groupId && data.groupId !== null) {
     const group = await db.get('groups', data.groupId);
     if (!group) errors.groupId = 'Group not found.';
+  }
+
+  // Guard the data layer too: the form asks first, but imports and other
+  // callers must not create a second tracker for the same type and owner.
+  if (!errors.duplicate) {
+    const existingRows = await db.getAll('subscriptions');
+    const duplicate = findDuplicateSubscription(existingRows, data);
+    if (duplicate) {
+      errors.duplicate = duplicate.trackedFor
+        ? `${data.merchantName} is already tracked for ${duplicate.trackedFor}.`
+        : `${data.merchantName} is already in your tracker. Set who this one is for to track someone else's subscription.`;
+    }
   }
 
   throwIfErrors(errors);

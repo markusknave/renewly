@@ -19,6 +19,7 @@ import {
   listPaymentMethods,
   savePaymentMethod,
   deletePaymentMethod,
+  findDuplicateSubscription,
   getSettings,
   saveSettings,
   validateSubscriptionInput,
@@ -393,4 +394,61 @@ test('summarize treats the reminder window as inclusive and counts trials', asyn
   const sameDay = summarize(rows, { today, reminderDays: [0] });
   assert.equal(sameDay.dueSoonCount, 1);
   assert.equal(sameDay.next.merchantName, 'Today');
+});
+
+test('subscription and group names are capped at 25 characters', async () => {
+  const db = createMemoryBackend();
+  const twentyFive = 'x'.repeat(25);
+  const twentySix = 'x'.repeat(26);
+
+  const saved = await saveSubscription(db, subscriptionInput({ merchantName: twentyFive }));
+  assert.equal(saved.merchantName.length, 25);
+  await assert.rejects(
+    () => saveSubscription(db, subscriptionInput({ merchantName: twentySix })),
+    /25 characters or fewer/
+  );
+  await assert.rejects(
+    () => saveSubscription(db, subscriptionInput({ merchantName: 'Car', trackedFor: twentySix })),
+    /Tracked-for name must be 25 characters or fewer/
+  );
+
+  const group = await saveGroup(db, { name: twentyFive });
+  assert.equal(group.name.length, 25);
+  await assert.rejects(() => saveGroup(db, { name: twentySix }), /25 characters or fewer/);
+});
+
+test('a second tracker needs a different owner for the same service and plan', async () => {
+  const db = createMemoryBackend();
+  const mine = { merchantKey: 'netflix', merchantName: 'Netflix', planId: 'standard', planName: 'Standard' };
+
+  const first = await saveSubscription(db, subscriptionInput(mine));
+  await assert.rejects(
+    () => saveSubscription(db, subscriptionInput(mine)),
+    /already in your tracker/
+  );
+
+  const forMom = await saveSubscription(db, subscriptionInput({ ...mine, trackedFor: 'Mom' }));
+  assert.equal(forMom.trackedFor, 'Mom');
+  await assert.rejects(
+    () => saveSubscription(db, subscriptionInput({ ...mine, trackedFor: 'mom' })),
+    /already tracked for Mom/
+  );
+
+  // A different plan is a different subscription type.
+  const premium = await saveSubscription(
+    db,
+    subscriptionInput({ ...mine, planId: 'premium', planName: 'Premium' })
+  );
+  assert.equal(premium.planId, 'premium');
+
+  // Editing the same record does not trip its own guard.
+  const renamed = await saveSubscription(
+    db,
+    subscriptionInput({ ...first, merchantName: 'Netflix PH' })
+  );
+  assert.equal(renamed.id, first.id);
+
+  const rows = await listSubscriptions(db);
+  assert.equal(rows.length, 3);
+  assert.equal(findDuplicateSubscription(rows, { ...mine, id: first.id }), null);
 });

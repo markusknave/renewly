@@ -280,6 +280,90 @@
       "planId": "nitro-basic",
       "sourceUrl": "https://discord.com/nitro",
       "extract": "Nitro Basic</div>[\\s\\S]{0,300}?\\$([\\d,.]+)"
+    },
+    {
+      "platformKey": "apple-arcade",
+      "planId": "monthly",
+      "sourceUrl": "https://www.apple.com/ph/apple-arcade/",
+      "extract": "Apple Arcade is ₱([\\d,]+) per month"
+    },
+    {
+      "platformKey": "apple-arcade",
+      "planId": "annual",
+      "sourceUrl": "https://www.apple.com/ph/apple-arcade/",
+      "extract": "per month or ₱([\\d,]+) per year"
+    },
+    {
+      "platformKey": "apple-fitness-plus",
+      "planId": "monthly",
+      "sourceUrl": "https://www.apple.com/ph/apple-fitness-plus/",
+      "extract": "pay\\s*₱([\\d,]+)\\s*per month"
+    },
+    {
+      "platformKey": "apple-fitness-plus",
+      "planId": "annual",
+      "sourceUrl": "https://www.apple.com/ph/apple-fitness-plus/",
+      "extract": "per month or\\s*₱([\\d,]+)\\s*annually"
+    },
+    {
+      "platformKey": "viu",
+      "planId": "premium-30d",
+      "sourceUrl": "https://dito.ph/entertainment-partners/video/viu",
+      "extract": "30 Days[\\s\\S]{0,250}?₱([\\d,]+)"
+    },
+    {
+      "platformKey": "viu",
+      "planId": "premium-7d",
+      "sourceUrl": "https://dito.ph/entertainment-partners/video/viu",
+      "extract": "7 Days[\\s\\S]{0,250}?₱([\\d,]+)"
+    },
+    {
+      "platformKey": "iqiyi",
+      "planId": "vip-monthly",
+      "sourceUrl": "https://dito.ph/entertainment-partners/video/iqiyi",
+      "extract": "iQIYI\\s*/\\s*P([\\d,]+)"
+    },
+    {
+      "platformKey": "wetv",
+      "planId": "vip-monthly",
+      "sourceUrl": "https://dito.ph/entertainment-partners/video/wetv",
+      "extract": "P\\s*([\\d,]+)/Month"
+    },
+    {
+      "platformKey": "mubi",
+      "planId": "classic-monthly",
+      "sourceUrl": "https://mubi.com/en/ph/memberships",
+      "extract": "\"month\":\\{\"name\":\"1 month\"[^}]*?\"price\":\"₱([\\d,]+)\""
+    },
+    {
+      "platformKey": "mubi",
+      "planId": "classic-annual",
+      "sourceUrl": "https://mubi.com/en/ph/memberships",
+      "extract": "\"year\":\\{\"name\":\"12 month\"[^}]*?\"price\":\"₱([\\d,]+)\""
+    },
+    {
+      "platformKey": "mubi",
+      "planId": "classic-student",
+      "sourceUrl": "https://mubi.com/en/ph/memberships",
+      "extract": "\"month_student\":\\{\"name\":\"1 month\"[^}]*?\"price\":\"₱([\\d,]+)\""
+    },
+    {
+      "platformKey": "strava",
+      "planId": "individual-annual",
+      "sourceUrl": "https://www.strava.com/subscribe",
+      "extract": "Individual Subscription[\\s\\S]{0,600}?Billed at ₱([\\d,.]+)/year"
+    },
+    {
+      "platformKey": "strava",
+      "planId": "family-annual",
+      "sourceUrl": "https://www.strava.com/subscribe",
+      "extract": "Family Subscription[\\s\\S]{0,600}?Billed at ₱([\\d,.]+)/year"
+    },
+    {
+      "platformKey": "strava",
+      "planId": "student-annual",
+      "sourceUrl": "https://www.strava.com/subscribe",
+      "extract": "Student Subscription[\\s\\S]{0,400}?Billed at ₱([\\d,.]+)/year"
     }
   ]
 }

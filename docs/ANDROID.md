@@ -89,12 +89,21 @@ for a Play Store release.
 - `public/js/db.js` opens IndexedDB version 2. The upgrade creates the `groups`
   store and leaves existing subscriptions, payment methods, and settings alone.
 - Android updates an app in place when the package name, version code, and
-  signing key match. Version code 2 and the stable beta key guarantee that for
-  beta-0.2 and newer builds.
+  signing key match. Version code 3 and the stable beta key guarantee that for
+  beta-0.3 and newer builds.
 - Sideloading a package signed by a different key fails with
   `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the only workaround is a one-time
   uninstall, which erases app data. Export JSON first if you hit this with an
   older build.
+
+### Export and import
+
+Android's WebView ignores `<a download>` for blob URLs, so the app does not rely
+on it. **Settings → Your data → Export JSON** writes
+`renewly-YYYY-MM-DD.json` to the app cache with `@capacitor/filesystem` and opens
+the system share sheet through `@capacitor/share`, so the file can be saved to
+Files, Drive, or another app. **Import JSON** opens an in-app dialog with a file
+field and a paste box, and validates the backup before replacing local data.
 
 ### Notifications
 
@@ -147,7 +156,7 @@ npm run icons
 | Old UI after an update | Fully close the app; bump `CACHE_NAME` in `public/sw.js`; rebuild the APK. |
 | Catalog is empty | Confirm `public/data/plans.json` exists and was copied by `android:sync`. |
 | Data disappeared | App storage was cleared or the APK was uninstalled. Restore from an exported JSON file. |
-| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-0.2, then import the JSON file. |
+| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-0.3, then import the JSON file. |
 | No notification when closed | Grant notification/alarm permission in Android settings and allow Renewly to run without battery restrictions. |
 | Build fails with missing SDK | Install Android SDK Platform 36 and Build-Tools in Android Studio. |
 | PWA install option missing | The page is not HTTPS or `localhost`. Use the APK or an HTTPS host. |

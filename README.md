@@ -7,10 +7,13 @@ what is renewing or expiring next.
 
 - Recurring subscriptions and one-time deals that expire
 - Custom groups such as Cars or Home, with a payment-method breakdown per group
+- One tracker per subscription type, plus a **Tracked for** owner when you pay
+  for someone else's subscription of the same type
 - Monthly/yearly normalization, due-soon and overdue lists
-- Plan catalog for mainstream platforms with Philippine prices, source links, and
-  verification dates
-- A payment-method label per subscription
+- Plan catalog for 26 mainstream platforms with Philippine prices, source links,
+  and verification dates
+- Payment methods picked from Philippine banks and e-wallets, filtered by type
+- Time-zone dropdown with every IANA zone and its current UTC offset
 - Scheduled Android notifications that fire even when the app is closed
 - Installable PWA and a Capacitor Android shell that bundles the app
 - Zero runtime web dependencies (the web app is plain ES modules)
@@ -18,11 +21,11 @@ what is renewing or expiring next.
 ## Download
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-0.2](https://github.com/markusknave/renewly/releases/tag/beta-0.2), and its
+[beta-0.3](https://github.com/markusknave/renewly/releases/tag/beta-0.3), and its
 only release asset is the installable APK:
 
 ```text
-renewly-beta-0.2.apk
+renewly-beta-0.3.apk
 ```
 
 Download it on the phone, tap it, and allow **Install unknown apps** for the
@@ -33,19 +36,26 @@ expected for a beta sideload.
 To install with `adb` instead:
 
 ```bash
-adb install -r renewly-beta-0.2.apk
+adb install -r renewly-beta-0.3.apk
 ```
+
+### Updating from beta-0.2
+
+> Installing beta-0.3 over beta-0.2 keeps the IndexedDB database. The schema
+> stays at version 2; the new **Tracked for** field is stored on subscription
+> records, so no migration step is needed. Both APKs use the same beta key, so
+> the update installs in place.
 
 ### Updating from beta-0.1
 
-> Installing beta-0.2 over an existing beta install keeps the IndexedDB
+> Installing beta-0.3 over an existing beta install keeps the IndexedDB
 > database: the version 2 upgrade only adds a groups store. Every beta-0.2 and
 > newer APK is signed with the same bundled beta key, so future updates also
 > install in place.
 >
 > beta-0.1 CI builds used a runner-generated debug key. If Android rejects the
 > install with a signature mismatch, export your data first, uninstall beta-0.1
-> once, then install beta-0.2 and import the JSON backup. From beta-0.2 onward
+> once, then install beta-0.3 and import the JSON backup. From beta-0.2 onward
 > this one-time step is not needed.
 
 ## What changed from v1
@@ -76,7 +86,7 @@ HOST=0.0.0.0 npm run serve
 ```
 
 Chrome only offers PWA installation on HTTPS or `localhost`; for a real phone
-install, use the APK below or serve `public/` over HTTPS.
+install, use the APK above or serve `public/` over HTTPS.
 
 ```bash
 npm test               # node:test suites
@@ -105,6 +115,9 @@ cloud and uploads it as the `renewly-debug-apk` artifact. See
 
 `public/data/plans.json` is the bundled catalog. It is a snapshot, not a live
 feed: the app never scrapes, so prices work offline and cannot silently change.
+It ships 26 platforms, including Apple Arcade, Apple Fitness+, Viu, iQIYI,
+WeTV, MUBI, and Strava alongside the streaming, music, AI, software, storage,
+gaming, and membership platforms from earlier betas.
 
 - Prices are stored as PHP cents. Platforms that publish PHP pricing are used
   directly; USD prices are converted with the rate recorded in `fx`.
@@ -133,7 +146,14 @@ reports when a page changes so you can re-verify the price by hand.
 - App updates keep the database. The APK is signed with the same bundled beta
   key for every beta-0.2+ build, so Android upgrades the app in place.
 - No network requests except opening a catalog source link you tap.
-- Export produces a plain JSON file; Import replaces all data on the device.
+- Export produces a plain JSON file (format version 3). On Android the file is
+  written to the app cache and handed to the system share sheet so it can be
+  saved to Files, Drive, or another app; in a browser it uses the save picker or
+  a normal download.
+- Import accepts a file or pasted JSON and replaces all data on the device.
+  Backups from beta-0.1 and beta-0.2 still import.
+- Subscription names, `Tracked for` labels, and group names are limited to 25
+  characters so long names cannot break the layout.
 - Erasing site data, clearing app storage, or uninstalling the APK deletes the
   database. Export first if you care about it.
 
@@ -159,6 +179,11 @@ reports when a page changes so you can re-verify the price by hand.
   closed-app reminders.
 - Catalog prices are point-in-time snapshots and vary by region, plan, and
   promotions. Always confirm on the platform before paying.
+- Subscription names, `Tracked for` labels, and group names are capped at 25
+  characters. Plan names from the catalog may be longer and are truncated in
+  rows.
+- Payment-method labels come from a bundled list of Philippine banks and
+  e-wallets. Pick **Other / custom…** for a provider that is not listed.
 - The web app needs a modern browser with IndexedDB. Private browsing may block
   storage.
 - The bundled beta signing key is for sideload builds only. Use a private key
@@ -173,10 +198,13 @@ public/
   js/views.js            dashboard, form, groups, catalog, cards, settings
   js/db.js               IndexedDB backend + in-memory backend for tests
   js/store.js            validation, CRUD, groups, settings, summary math
+  js/backup.js           JSON backup build/validate/apply
   js/catalog.js          bundled catalog loader
   js/reminders.js        reminder occurrence computation
   js/notifications.js    Capacitor local-notification bridge
   js/lib/dates.js        date, money, and cadence helpers
+  js/lib/providers.js    Philippine banks and e-wallets per payment type
+  js/lib/timezones.js    IANA zone list with current UTC offsets
   data/plans.json        PH plan catalog
   sw.js                  offline shell cache
   styles.css             UI

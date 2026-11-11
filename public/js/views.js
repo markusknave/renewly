@@ -1,6 +1,15 @@
 import { CADENCE_LABELS, formatDateHuman, formatMoney } from './lib/dates.js';
 import { catalogCategories } from './catalog.js';
-import { PAYMENT_KIND_LABELS, summarizeGroups, UNGROUPED_LABEL } from './store.js';
+import { CUSTOM_PROVIDER, providersFor } from './lib/providers.js';
+import { timezoneOptions } from './lib/timezones.js';
+import {
+	MAX_DISPLAY_NAME,
+	MAX_GROUP_NAME_LENGTH,
+	MAX_METHOD_LABEL_LENGTH,
+	PAYMENT_KIND_LABELS,
+	summarizeGroups,
+	UNGROUPED_LABEL,
+} from './store.js';
 
 const STATUS_LABELS = {
 	active: 'Active',
@@ -40,6 +49,38 @@ function options(values, selected, labels = {}) {
 				)}</option>`
 		)
 		.join('');
+}
+
+// Bank or e-wallet choices for the selected payment type. A saved label that is
+// not in the list (older free-text data) selects the custom option instead of
+// being silently replaced.
+export function providerOptions(kind, selected) {
+	const names = providersFor(kind);
+	const current = String(selected || '');
+	const listed = names.includes(current);
+	const parts = [];
+	if (!current) parts.push('<option value="" selected>Choose…</option>');
+	for (const name of names) {
+		parts.push(
+			`<option value="${esc(name)}"${name === current ? ' selected' : ''}>${esc(name)}</option>`
+		);
+	}
+	parts.push(
+		`<option value="${CUSTOM_PROVIDER}"${current && !listed ? ' selected' : ''}>Other / custom…</option>`
+	);
+	return parts.join('');
+}
+
+function methodProviderField(kind, label) {
+	const custom = Boolean(label) && !providersFor(kind).includes(label);
+	return `<label>Bank / E-wallet
+		<select name="provider" data-method-provider>${providerOptions(kind, label)}</select>
+	</label>
+	<label data-custom-method-label${custom ? '' : ' hidden'}>Custom label
+		<input type="text" name="customLabel" maxlength="${MAX_METHOD_LABEL_LENGTH}" value="${
+			custom ? esc(label) : ''
+		}" placeholder="Bank or wallet name" />
+	</label>`;
 }
 
 function avatar(name) {
@@ -98,9 +139,10 @@ function groupName(groups, id) {
 
 function subscriptionSub(sub, groups) {
 	const plan = sub.planName || (sub.kind === 'one_time' ? 'One-time' : 'No plan');
-	return groups.some((group) => group.id === sub.groupId)
-		? `${plan} · ${groupName(groups, sub.groupId)}`
-		: plan;
+	const owner = sub.trackedFor ? ` · for ${sub.trackedFor}` : '';
+	return groups.some((group) => String(group.id) === String(sub.groupId))
+		? `${plan} · ${groupName(groups, sub.groupId)}${owner}`
+		: `${plan}${owner}`;
 }
 
 function summaryCards(summary, settings) {
@@ -152,8 +194,12 @@ function dueSection(summary, today) {
 }
 
 function groupFilterBar(groups, groupFilter, subscriptions) {
-	const hasUngrouped = subscriptions.some((sub) => !groups.some((group) => group.id === sub.groupId));
+	const hasUngrouped = subscriptions.some(
+		(sub) => !groups.some((group) => String(group.id) === String(sub.groupId))
+	);
 	if (!groups.length && !hasUngrouped) return '';
+	// The bar is built from every subscription, not the filtered rows, so the
+	// Ungrouped chip stays available while a group is selected.
 	const all = `<button class="chip${!groupFilter ? ' on' : ''}" type="button" data-group-filter="">All groups</button>`;
 	const chips = groups.map(
 		(group) =>
@@ -175,7 +221,9 @@ function subscriptionRows(subscriptions, methods, today, groups = []) {
 	return subscriptions
 		.map(
 			(s) => `<tr>
-				<td><span class="merchant">${avatar(s.merchantName)}<span>${esc(s.merchantName)}<span class="sub">${esc(
+				<td><span class="merchant">${avatar(s.merchantName)}<span><span class="merchant-name" title="${esc(
+					s.merchantName
+				)}">${esc(s.merchantName)}</span><span class="sub">${esc(
 					subscriptionSub(s, groups)
 				)}</span></span></span></td>
 				<td class="num">${costLabel(s)}</td>
@@ -183,7 +231,7 @@ function subscriptionRows(subscriptions, methods, today, groups = []) {
 				<td>${methodLabel(methods, s.paymentMethodId)}</td>
 				<td>${statusPill(s, today)}</td>
 				<td class="actions-head">
-					<div class="actions">
+					<div class="row-actions">
 						<a class="link" href="#/edit/${s.id}">Edit</a>
 						<button class="link danger" type="button" data-action="delete-sub" data-id="${s.id}">Delete</button>
 					</div>
@@ -193,7 +241,16 @@ function subscriptionRows(subscriptions, methods, today, groups = []) {
 		.join('');
 }
 
-export function dashboardView({ subscriptions, summary, methods, groups = [], groupFilter = '', settings, today }) {
+export function dashboardView({
+	subscriptions,
+	allSubscriptions = subscriptions,
+	summary,
+	methods,
+	groups = [],
+	groupFilter = '',
+	settings,
+	today,
+}) {
 	const active = subscriptions.filter((s) => s.status !== 'canceled');
 	const canceled = subscriptions.filter((s) => s.status === 'canceled');
 	return `<div class="page-head">
@@ -205,7 +262,7 @@ export function dashboardView({ subscriptions, summary, methods, groups = [], gr
 			<a class="btn btn-primary" href="#/add">Add subscription</a>
 		</div>
 	</div>
-	${groupFilterBar(groups, groupFilter, subscriptions)}
+	${groupFilterBar(groups, groupFilter, allSubscriptions)}
 	${summaryCards(summary, settings)}
 	${dueSection(summary, today)}
 	<section class="panel">
@@ -278,7 +335,7 @@ function planOptions(platform, selected) {
 	].join('');
 }
 
-export function formView({ sub, methods, groups = [], catalog, today }) {
+export function formView({ sub, methods, groups = [], catalog, today, duplicate = null }) {
 	const s = {
 		id: null,
 		kind: 'recurring',
@@ -295,6 +352,7 @@ export function formView({ sub, methods, groups = [], catalog, today }) {
 		notes: '',
 		paymentMethodId: '',
 		groupId: '',
+		trackedFor: '',
 		...(sub || {}),
 	};
 	const platform = catalog?.platforms?.find((p) => p.key === s.merchantKey) || null;
@@ -303,6 +361,14 @@ export function formView({ sub, methods, groups = [], catalog, today }) {
 	const editing = Boolean(s.id);
 	const dateText = kind === 'one_time' ? 'Expires on' : 'Next renewal';
 	const cadenceDisabled = kind === 'one_time' ? ' disabled' : '';
+	const duplicateNotice = duplicate
+		? `<div class="banner banner-error" role="alert">
+				<strong>${esc(duplicate.merchantName)}${
+					duplicate.planName ? ` · ${esc(duplicate.planName)}` : ''
+				} is already in your tracker${duplicate.trackedFor ? ` for ${esc(duplicate.trackedFor)}` : ''}.</strong>
+				<span> Is this subscription for another individual or group? Fill in <em>Tracked for</em> below and save again; each person or group is tracked separately.</span>
+			</div>`
+		: '';
 	return `<div class="page-head">
 		<div>
 			<h1>${editing ? 'Edit subscription' : 'Add subscription'}</h1>
@@ -310,6 +376,7 @@ export function formView({ sub, methods, groups = [], catalog, today }) {
 		</div>
 		<div class="page-head-actions"><a class="btn" href="#/">Back</a></div>
 	</div>
+	${duplicateNotice}
 	<section class="panel">
 		<form class="stack" data-form="subscription"${editing ? ` data-id="${s.id}"` : ''}>
 			<div class="grid-2">
@@ -317,9 +384,10 @@ export function formView({ sub, methods, groups = [], catalog, today }) {
 					<select name="platformKey" data-platform>${platformOptions(catalog, platform ? platform.key : '')}</select>
 				</label>
 				<label>Service name
-					<input type="text" name="merchantName" maxlength="120" required value="${esc(
+					<input type="text" name="merchantName" maxlength="${MAX_DISPLAY_NAME}" required value="${esc(
 						s.merchantName || platform?.name || ''
 					)}" placeholder="Netflix" />
+					<span class="hint">${MAX_DISPLAY_NAME} characters max.</span>
 				</label>
 			</div>
 			<div class="grid-2">
@@ -392,6 +460,12 @@ export function formView({ sub, methods, groups = [], catalog, today }) {
 							.join('')}
 					</select>
 					<span class="hint">Create groups on the Groups tab.</span>
+				</label>
+				<label>Tracked for
+					<input type="text" name="trackedFor" maxlength="${MAX_DISPLAY_NAME}" value="${esc(
+						s.trackedFor || ''
+					)}" placeholder="Leave blank if this is yours"${duplicate ? ' required' : ''} />
+					<span class="hint">Who pays for it? Leave blank for your own subscription.</span>
 				</label>
 			</div>
 			<label>Notes
@@ -471,35 +545,36 @@ export function catalogView({ catalog, today }) {
 
 export function cardsView({ methods }) {
 	const rows = methods
-		.map(
-			(m) => `<form class="method-row" data-form="method" data-id="${m.id}">
-				<label>Label<input type="text" name="label" maxlength="80" required value="${esc(m.label)}" /></label>
-				<label>Type<select name="kind">${options(
+		.map((m) => {
+			const kind = m.kind || 'other';
+			return `<form class="method-row" data-form="method" data-id="${m.id}">
+				<label>Type<select name="kind" data-method-kind>${options(
 					['card', 'ewallet', 'bank', 'cash', 'other'],
-					m.kind || 'card',
+					kind,
 					PAYMENT_KIND_LABELS
 				)}</select></label>
+				${methodProviderField(kind, m.label)}
 				<label>Last 4<input type="text" name="last4" inputmode="numeric" maxlength="4" value="${esc(
 					m.last4 || ''
 				)}" placeholder="1234" /></label>
 				<label>Notes<input type="text" name="notes" maxlength="200" value="${esc(m.notes || '')}" /></label>
-				<div class="actions">
+				<div class="row-actions">
 					<button class="btn btn-small" type="submit">Save</button>
 					<button class="link danger" type="button" data-action="delete-method" data-id="${m.id}">Delete</button>
 				</div>
-			</form>`
-		)
+			</form>`;
+		})
 		.join('');
 	return `<div class="page-head"><div><h1>Payment methods</h1><p class="muted">Labels only. Renewly never asks for a card number.</p></div></div>
 	<section class="panel">
 		<div class="panel-head"><h2>Add a method</h2></div>
-		<form class="grid-4" data-form="method">
-			<label>Label<input type="text" name="label" maxlength="80" required placeholder="BPI Visa" /></label>
-			<label>Type<select name="kind">${options(
+		<form class="method-create" data-form="method">
+			<label>Type<select name="kind" data-method-kind>${options(
 				['card', 'ewallet', 'bank', 'cash', 'other'],
 				'card',
 				PAYMENT_KIND_LABELS
 			)}</select></label>
+			${methodProviderField('card', '')}
 			<label>Last 4<input type="text" name="last4" inputmode="numeric" maxlength="4" placeholder="1234" /></label>
 			<label>Notes<input type="text" name="notes" maxlength="200" /></label>
 			<div class="form-actions"><button class="btn btn-primary" type="submit">Add</button></div>
@@ -509,13 +584,15 @@ export function cardsView({ methods }) {
 		<div class="panel-head"><h2>Saved methods</h2><span class="muted small">${methods.length}</span></div>
 		${
 			rows ||
-			'<p class="muted small">No payment methods yet. Add one to label which card or e-wallet pays each subscription.</p>'
+			'<p class="muted small">No payment methods yet. Pick a bank or e-wallet to label which one pays each subscription.</p>'
 		}
 	</section>`;
 }
 
 function methodBreakdown(methodCounts, methods, subscriptions) {
-	if (!methodCounts.length) return '<p class="muted small">No subscriptions in this group yet.</p>';
+	if (!methodCounts.length) {
+		return '<p class="muted small group-methods-empty">No subscriptions in this group yet.</p>';
+	}
 	return `<div class="group-methods" aria-label="Payment methods used in this group">${methodCounts
 		.map(({ paymentMethodId, count }) => {
 			const method = methods.find((m) => m.id === paymentMethodId);
@@ -542,7 +619,7 @@ export function groupsView({ groups, subscriptions, methods, today }) {
 			(group) => `<section class="panel">
 				<div class="panel-head group-head">
 					<form class="group-rename" data-form="group" data-id="${group.id}">
-						<input type="text" name="name" maxlength="60" required aria-label="Group name" value="${esc(
+						<input type="text" name="name" maxlength="${MAX_GROUP_NAME_LENGTH}" required aria-label="Group name" value="${esc(
 							group.name
 						)}" />
 						<button class="btn btn-small" type="submit">Rename</button>
@@ -555,7 +632,7 @@ export function groupsView({ groups, subscriptions, methods, today }) {
 					</div>
 				</div>
 				<div class="group-methods-wrap">
-					<span class="muted small">Paid with</span>
+					<span class="muted small group-methods-label">Paid with</span>
 					${methodBreakdown(group.methodCounts, methods, group.subscriptions)}
 				</div>
 				${
@@ -590,11 +667,11 @@ export function groupsView({ groups, subscriptions, methods, today }) {
 	</div>
 	<section class="panel">
 		<div class="panel-head"><h2>New group</h2></div>
-		<form class="grid-4" data-form="group">
-			<label>Group name<input type="text" name="name" maxlength="60" required placeholder="Cars" /></label>
-			<div class="form-actions"><button class="btn btn-primary" type="submit">Create group</button></div>
+		<form class="group-create" data-form="group">
+			<label>Group name<input type="text" name="name" maxlength="${MAX_GROUP_NAME_LENGTH}" required placeholder="Cars" /></label>
+			<button class="btn btn-primary" type="submit">Create group</button>
 		</form>
-		<p class="hint">Group names are stored on this device. Delete a group to keep its subscriptions and move them to ${esc(
+		<p class="hint">Group names are stored on this device and capped at ${MAX_GROUP_NAME_LENGTH} characters. Delete a group to keep its subscriptions and move them to ${esc(
 			UNGROUPED_LABEL
 		)}.</p>
 	</section>
@@ -607,6 +684,14 @@ export function groupsView({ groups, subscriptions, methods, today }) {
 
 export function settingsView({ settings, catalog, stats, notifyPermission, subscriptionCount }) {
 	const reminderDays = (settings.reminderDays || []).join(', ');
+	const zones = timezoneOptions(settings.timezone)
+		.map(
+			(zone) =>
+				`<option value="${esc(zone.value)}"${
+					zone.value === settings.timezone ? ' selected' : ''
+				}>${esc(zone.label)}</option>`
+		)
+		.join('');
 	const catalogInfo = catalog
 		? `Catalog ${esc(catalog.generatedAt || 'unknown')} · ${catalog.platforms.length} platforms · region ${esc(
 				catalog.region
@@ -618,8 +703,8 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 		<form class="stack" data-form="settings">
 			<div class="grid-2">
 				<label>Time zone
-					<input type="text" name="timezone" value="${esc(settings.timezone)}" placeholder="Asia/Manila" />
-					<span class="hint">Used to decide what "today" means on the dashboard.</span>
+					<select name="timezone">${zones}</select>
+					<span class="hint">All time zones are listed with their current UTC offset, including daylight-saving shifts. Used to decide what "today" means.</span>
 				</label>
 				<label>Reminder days
 					<input type="text" name="reminderDays" value="${esc(reminderDays)}" placeholder="7, 3, 1" />
@@ -644,19 +729,38 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 	</section>
 	<section class="panel">
 		<div class="panel-head"><h2>Your data</h2><span class="muted small">${subscriptionCount} subscriptions</span></div>
-		<div class="actions">
+		<div class="data-actions">
 			<button class="btn" type="button" data-action="export">Export JSON</button>
 			<button class="btn" type="button" data-action="import">Import JSON</button>
 			<button class="btn btn-danger" type="button" data-action="clear-data">Erase all data</button>
 		</div>
-		<input type="file" id="import-file" accept="application/json,.json" hidden />
-		<p class="hint">Export is a plain JSON file. Import replaces everything currently on this device.</p>
+		<p class="hint">Export writes a plain JSON file (on Android it opens the share sheet so you can save it to Files or Drive). Import replaces everything currently on this device.</p>
 	</section>
 	<section class="panel">
 		<div class="panel-head"><h2>About</h2></div>
 		<p class="muted small">${esc(catalogInfo)}</p>
 		<p class="muted small">Renewly runs entirely offline. No account, no server, no email forwarding.</p>
-	</section>`;
+	</section>
+	<dialog class="dialog" id="import-dialog" aria-labelledby="import-title">
+		<div class="dialog-head">
+			<h2 id="import-title">Import JSON</h2>
+			<button class="link" type="button" data-action="close-import">Close</button>
+		</div>
+		<form class="stack compact" data-form="import">
+			<label>Backup file
+				<input type="file" id="import-file" accept="application/json,.json" />
+				<span class="hint">Choose the <code>renewly-YYYY-MM-DD.json</code> file you exported.</span>
+			</label>
+			<label>Or paste the JSON
+				<textarea name="backupText" rows="5" spellcheck="false" placeholder='{"app":"renewly", ...}'></textarea>
+			</label>
+			<p class="banner banner-error" id="import-error" role="alert" hidden></p>
+			<div class="form-actions">
+				<button class="btn" type="button" data-action="close-import">Cancel</button>
+				<button class="btn btn-primary" type="submit">Replace all data</button>
+			</div>
+		</form>
+	</dialog>`;
 }
 
 export function missingView() {

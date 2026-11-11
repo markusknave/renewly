@@ -29,6 +29,7 @@ const CATEGORIES = [
   'cloud-storage',
   'gaming',
   'memberships',
+  'fitness',
 ];
 const HTTPS = /^https:\/\/[^\s]+$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

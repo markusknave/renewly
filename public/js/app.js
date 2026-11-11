@@ -1,6 +1,8 @@
 import { openDb } from './db.js';
 import * as store from './store.js';
 import * as notifications from './notifications.js';
+import * as backup from './backup.js';
+import { CUSTOM_PROVIDER } from './lib/providers.js';
 import { findPlan, findPlatform, loadCatalog } from './catalog.js';
 import {
 	CADENCE_LABELS,
@@ -21,6 +23,9 @@ const state = {
 	settings: { currency: 'PHP', timezone: 'Asia/Manila', reminderDays: [7, 3, 1] },
 	catalog: null,
 	flash: null,
+	// Set when a submitted subscription duplicates an existing tracker: the
+	// form is re-rendered with its values plus the "tracked for" question.
+	formDraft: null,
 	notifyPermission: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
 };
 
@@ -37,6 +42,12 @@ function parseRoute() {
 		return { name: parts[0] };
 	}
 	return { name: 'dashboard' };
+}
+
+function routeKey(route) {
+	if (route.name === 'add') return 'add';
+	if (route.name === 'edit') return `edit:${route.id}`;
+	return route.name;
 }
 
 function slug(value) {
@@ -110,11 +121,15 @@ async function render() {
 		route.name === 'dashboard'
 			? store.summarize(filtered, { today: iso, reminderDays: state.settings.reminderDays })
 			: null;
+	const key = routeKey(route);
+	const draft = state.formDraft && state.formDraft.route === key ? state.formDraft : null;
+	const duplicate = draft?.duplicate ?? null;
 
 	let body = '';
 	if (route.name === 'dashboard') {
 		body = views.dashboardView({
 			subscriptions: filtered,
+			allSubscriptions: state.subscriptions,
 			summary,
 			methods: state.methods,
 			groups: state.groups,
@@ -140,22 +155,29 @@ async function render() {
 			}
 		}
 		body = views.formView({
-			sub: defaults,
+			sub: draft?.data || defaults,
 			methods: state.methods,
 			groups: state.groups,
 			catalog: state.catalog,
 			today: iso,
+			duplicate:
+				duplicate ||
+				(defaults.merchantName
+					? store.findDuplicateSubscription(state.subscriptions, defaults)
+					: null),
 		});
 	} else if (route.name === 'edit') {
 		const sub = await store.getSubscription(state.db, route.id);
 		if (token !== renderToken) return;
-		body = sub
+		const editing = draft?.data || sub;
+		body = editing
 			? views.formView({
-					sub,
+					sub: editing,
 					methods: state.methods,
 					groups: state.groups,
 					catalog: state.catalog,
 					today: iso,
+					duplicate,
 				})
 			: views.missingView();
 	} else if (route.name === 'catalog') {
@@ -252,15 +274,21 @@ function subscriptionInput(form) {
 		notes: String(fd.get('notes') || '').trim(),
 		paymentMethodId: readNumber(fd.get('paymentMethodId')),
 		groupId: readNumber(fd.get('groupId')),
+		trackedFor: String(fd.get('trackedFor') || '').trim() || null,
 		source: platformKey ? 'catalog' : 'manual',
 	};
 }
 
 function methodInput(form) {
 	const fd = new FormData(form);
+	const provider = String(fd.get('provider') || '');
+	const label =
+		provider === CUSTOM_PROVIDER
+			? String(fd.get('customLabel') || '').trim()
+			: provider.trim();
 	return {
 		id: form.dataset.id ? Number(form.dataset.id) : undefined,
-		label: String(fd.get('label') || '').trim(),
+		label,
 		kind: String(fd.get('kind') || 'other'),
 		last4: String(fd.get('last4') || '').replace(/\D/g, '').slice(0, 4),
 		notes: String(fd.get('notes') || '').trim(),
@@ -274,7 +302,18 @@ async function onSubmit(event) {
 	try {
 		const type = form.dataset.form;
 		if (type === 'subscription') {
-			await store.saveSubscription(state.db, subscriptionInput(form));
+			const input = subscriptionInput(form);
+			// Same service, plan, and owner already tracked: stop and ask
+			// whether this is a tracker for another person or group.
+			const duplicate = store.findDuplicateSubscription(state.subscriptions, input);
+			if (duplicate) {
+				const route = parseRoute();
+				state.formDraft = { route: routeKey(route), data: input, duplicate };
+				await render();
+				return;
+			}
+			state.formDraft = null;
+			await store.saveSubscription(state.db, input);
 			state.flash = { type: 'ok', message: 'Subscription saved' };
 			await reload();
 			if (state.notifyPermission === 'default') {
@@ -285,10 +324,20 @@ async function onSubmit(event) {
 			return;
 		}
 		if (type === 'method') {
-			await store.savePaymentMethod(state.db, methodInput(form));
+			const input = methodInput(form);
+			if (!input.label) throw new Error('Choose a bank or e-wallet, or pick Other and type a name.');
+			await store.savePaymentMethod(state.db, input);
 			state.flash = { type: 'ok', message: 'Payment method saved' };
 			await reload();
 			await render();
+			return;
+		}
+		if (type === 'import') {
+			const fd = new FormData(form);
+			const text = String(fd.get('backupText') || '').trim();
+			if (!text) throw new Error('Choose a backup file or paste its JSON first.');
+			const file = form.querySelector('#import-file')?.files?.[0];
+			await importBackupText(file ? await file.text() : text);
 			return;
 		}
 		if (type === 'group') {
@@ -317,6 +366,10 @@ async function onSubmit(event) {
 			await render();
 		}
 	} catch (err) {
+		if (form.dataset.form === 'import') {
+			showImportError(err?.message || 'Import failed');
+			return;
+		}
 		state.flash = { type: 'error', message: err?.message || 'Could not save' };
 		await render();
 	}
@@ -347,93 +400,132 @@ async function deleteGroup(id) {
 	await render();
 }
 
-async function exportData() {
-	const data = {
-		app: 'renewly',
-		version: 2,
-		exportedAt: new Date().toISOString(),
-		settings: state.settings,
-		groups: state.groups,
-		paymentMethods: state.methods,
-		subscriptions: state.subscriptions,
-	};
-	const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+// Writes the backup where the platform can actually put a file. Android's
+// WebView silently ignores `<a download>` for blob URLs, so native builds go
+// through Filesystem + Share; browsers use the save picker when available and
+// fall back to a download.
+async function saveBackupFile(text, fileName) {
+	const capacitor = globalThis.Capacitor;
+	if (capacitor && typeof capacitor.isNativePlatform === 'function' && capacitor.isNativePlatform()) {
+		const Filesystem = capacitor.Plugins?.Filesystem;
+		const Share = capacitor.Plugins?.Share;
+		if (Filesystem?.writeFile) {
+			const { uri } = await Filesystem.writeFile({
+				path: fileName,
+				data: text,
+				directory: 'CACHE',
+				encoding: 'UTF8',
+			});
+			if (Share?.share && uri) {
+				await Share.share({
+					title: fileName,
+					dialogTitle: 'Save Renewly backup',
+					files: [uri],
+				});
+				return 'shared';
+			}
+			return 'saved';
+		}
+	}
+
+	if (typeof globalThis.showSaveFilePicker === 'function') {
+		try {
+			const handle = await globalThis.showSaveFilePicker({
+				suggestedName: fileName,
+				types: [{ description: 'JSON backup', accept: { 'application/json': ['.json'] } }],
+			});
+			const writable = await handle.createWritable();
+			await writable.write(text);
+			await writable.close();
+			return 'saved';
+		} catch (err) {
+			if (err?.name === 'AbortError') return 'cancelled';
+			// Fall through to a plain download when the picker is blocked.
+		}
+	}
+
+	const blob = new Blob([text], { type: 'application/json' });
 	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
 	link.href = url;
-	link.download = `renewly-${today()}.json`;
+	link.download = fileName;
+	link.rel = 'noopener';
 	document.body.append(link);
 	link.click();
 	link.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
+	setTimeout(() => URL.revokeObjectURL(url), 4000);
+	return 'downloaded';
 }
 
-async function importData(file) {
-	const parsed = JSON.parse(await file.text());
-	if (parsed?.app !== 'renewly' || !Array.isArray(parsed.subscriptions)) {
-		throw new Error('Not a Renewly export file');
+async function exportData() {
+	const fileName = `renewly-${today()}.json`;
+	const text = backup.serializeExport(
+		backup.buildExport({
+			settings: state.settings,
+			groups: state.groups,
+			paymentMethods: state.methods,
+			subscriptions: state.subscriptions,
+		})
+	);
+	const outcome = await saveBackupFile(text, fileName);
+	if (outcome === 'cancelled') return;
+	state.flash = {
+		type: 'ok',
+		message:
+			outcome === 'downloaded'
+				? `Backup downloaded as ${fileName}`
+				: `Backup ready — save ${fileName} from the share sheet`,
+	};
+	await render();
+}
+
+function importDialog() {
+	return document.getElementById('import-dialog');
+}
+
+function showImportError(message) {
+	const dialog = importDialog();
+	const target = document.getElementById('import-error');
+	if (target) {
+		target.textContent = message;
+		target.hidden = false;
+		return;
 	}
-	if (!confirm('Replace all data on this device with the imported file?')) return;
-	await state.db.clear('subscriptions');
-	await state.db.clear('paymentMethods');
-	await state.db.clear('groups');
-	await state.db.clear('settings');
-	const idMap = new Map();
-	for (const method of parsed.paymentMethods || []) {
-		const oldId = method.id;
-		const key = await state.db.put('paymentMethods', {
-			label: String(method.label || 'Method').slice(0, 80),
-			kind: String(method.kind || 'other'),
-			last4: String(method.last4 || '').replace(/\D/g, '').slice(0, 4),
-			notes: String(method.notes || '').slice(0, 200),
-			createdAt: method.createdAt || new Date().toISOString(),
-		});
-		if (oldId !== undefined) idMap.set(oldId, Number(key));
+	state.flash = { type: 'error', message };
+	render();
+	if (dialog) openImportDialog();
+}
+
+function openImportDialog() {
+	const dialog = importDialog();
+	if (!dialog) return;
+	const error = document.getElementById('import-error');
+	if (error) {
+		error.hidden = true;
+		error.textContent = '';
 	}
-	const groupMap = new Map();
-	for (const group of parsed.groups || []) {
-		const oldId = group.id;
-		const key = await state.db.put('groups', {
-			name: String(group.name || 'Group').slice(0, 60),
-			createdAt: group.createdAt || new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-		});
-		if (oldId !== undefined) groupMap.set(oldId, Number(key));
-	}
-	for (const sub of parsed.subscriptions) {
-		const kind = sub.kind === 'one_time' ? 'one_time' : 'recurring';
-		await state.db.put('subscriptions', {
-			kind,
-			merchantKey: String(sub.merchantKey || slug(sub.merchantName)),
-			merchantName: String(sub.merchantName || 'Unknown').slice(0, 120),
-			planId: sub.planId || null,
-			planName: String(sub.planName || '').slice(0, 120),
-			amountCents: Number.isInteger(sub.amountCents) ? sub.amountCents : 0,
-			currency: 'PHP',
-			cadence: kind === 'one_time' ? null : sub.cadence || 'monthly',
-			customIntervalDays: sub.customIntervalDays ?? null,
-			status: ['active', 'trial', 'paused', 'canceled'].includes(sub.status) ? sub.status : 'active',
-			nextRenewalDate: sub.nextRenewalDate || null,
-			startedOn: sub.startedOn || null,
-			lastChargeDate: sub.lastChargeDate || null,
-			notes: String(sub.notes || '').slice(0, 2000),
-			paymentMethodId: sub.paymentMethodId != null ? idMap.get(sub.paymentMethodId) ?? null : null,
-			groupId: sub.groupId != null ? groupMap.get(sub.groupId) ?? null : null,
-			source: sub.source === 'catalog' ? 'catalog' : 'manual',
-			createdAt: sub.createdAt || new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-		});
-	}
-	if (parsed.settings) {
-		await store.saveSettings(state.db, {
-			currency: 'PHP',
-			timezone: String(parsed.settings.timezone || 'Asia/Manila'),
-			reminderDays: Array.isArray(parsed.settings.reminderDays)
-				? parsed.settings.reminderDays
-				: [7, 3, 1],
-		});
-	}
-	state.flash = { type: 'ok', message: 'Data imported' };
+	const textarea = dialog.querySelector('[name="backupText"]');
+	if (textarea) textarea.value = '';
+	if (typeof dialog.showModal === 'function') dialog.showModal();
+	else dialog.setAttribute('open', '');
+}
+
+function closeImportDialog() {
+	const dialog = importDialog();
+	if (!dialog) return;
+	if (typeof dialog.close === 'function') dialog.close();
+	else dialog.removeAttribute('open');
+}
+
+async function importBackupText(text) {
+	const normalized = backup.normalizeBackup(backup.parseBackup(text));
+	if (!confirm('Replace all data on this device with the imported backup?')) return;
+	const result = await backup.applyBackup(state.db, normalized);
+	closeImportDialog();
+	state.flash = {
+		type: 'ok',
+		message: `Imported ${result.imported} subscriptions, ${result.groups} groups, and ${result.paymentMethods} payment methods`,
+	};
 	await reload();
 	await render();
 }
@@ -459,7 +551,8 @@ async function onClick(event) {
 			else if (action === 'delete-method') await deleteMethod(Number(trigger.dataset.id));
 			else if (action === 'delete-group') await deleteGroup(Number(trigger.dataset.id));
 			else if (action === 'export') await exportData();
-			else if (action === 'import') document.getElementById('import-file')?.click();
+			else if (action === 'import') openImportDialog();
+			else if (action === 'close-import') closeImportDialog();
 			else if (action === 'clear-data') await clearData();
 			else if (action === 'enable-notifications') {
 				state.notifyPermission = await notifications.requestPermission();
@@ -495,17 +588,40 @@ async function onClick(event) {
 	}
 }
 
-function onChange(event) {
+async function onChange(event) {
 	const target = event.target;
 	if (target.id === 'import-file' && target.files?.[0]) {
-		importData(target.files[0]).catch((err) => {
-			state.flash = { type: 'error', message: err?.message || 'Import failed' };
-			render();
-		});
+		const file = target.files[0];
+		try {
+			await importBackupText(await file.text());
+		} catch (err) {
+			showImportError(err?.message || 'Import failed');
+		} finally {
+			target.value = '';
+		}
 		return;
 	}
 	const form = target.closest('form');
 	if (!form) return;
+	if (target.matches('[data-method-kind]')) {
+		const providerSelect = form.querySelector('[data-method-provider]');
+		if (providerSelect) providerSelect.innerHTML = views.providerOptions(target.value, '');
+		const customWrap = form.querySelector('[data-custom-method-label]');
+		if (customWrap) {
+			customWrap.hidden = true;
+			const customInput = customWrap.querySelector('input');
+			if (customInput) customInput.value = '';
+		}
+		return;
+	}
+	if (target.matches('[data-method-provider]')) {
+		const customWrap = form.querySelector('[data-custom-method-label]');
+		if (customWrap) {
+			customWrap.hidden = target.value !== CUSTOM_PROVIDER;
+			if (!customWrap.hidden) customWrap.querySelector('input')?.focus();
+		}
+		return;
+	}
 	if (target.matches('[data-platform]')) {
 		const platform = findPlatform(state.catalog, target.value);
 		const planSelect = form.querySelector('[data-plan]');
@@ -594,7 +710,11 @@ async function boot() {
 		if (Number.isInteger(id) && id > 0) location.hash = `#/edit/${id}`;
 	});
 	await render();
-	addEventListener('hashchange', () => render());
+	addEventListener('hashchange', () => {
+		// Leaving the add/edit screen drops any duplicate-tracking draft.
+		state.formDraft = null;
+		render();
+	});
 	app.addEventListener('click', onClick);
 	app.addEventListener('submit', onSubmit);
 	app.addEventListener('change', onChange);

@@ -172,17 +172,32 @@ hr {
 .nav {
   display: flex;
   align-items: center;
-  gap: 1.1rem;
-  font-size: 0.92rem;
+  justify-content: flex-end;
+  gap: 0.15rem;
+  margin-left: auto;
+  padding: 0.18rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-soft) 70%, transparent);
+  font-size: 0.9rem;
 }
 
 .nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.78rem;
+  border-radius: 999px;
   color: var(--muted);
   font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .nav a.on {
   color: var(--text);
+  background: var(--panel);
+  box-shadow: var(--shadow);
 }
 
 .nav a:hover {
@@ -544,6 +559,16 @@ textarea {
   align-items: center;
   gap: 0.6rem;
   min-width: 160px;
+  max-width: 100%;
+}
+
+.merchant > span {
+  min-width: 0;
+}
+
+.merchant-name {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
 .avatar {
@@ -568,6 +593,17 @@ textarea {
 
 .actions-head {
   text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Edit stays at the left edge of the cell, Delete at the right edge. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  min-width: 108px;
 }
 
 .pill {
@@ -904,14 +940,17 @@ details > summary::-webkit-details-marker {
     margin-right: 0.9rem;
   }
 
-  .subs-table td.actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem 0.9rem;
+  .subs-table td.actions-head {
+    display: block;
+    width: 100%;
     padding-top: 0.45rem;
     border-top: 1px solid var(--line);
     margin-top: 0.35rem;
+  }
+
+  .actions-head .row-actions {
+    min-width: 0;
+    width: 100%;
   }
 
   .merchant {
@@ -1056,34 +1095,147 @@ details > summary::-webkit-details-marker {
   font-size: 0.68rem;
 }
 
+/* New-group row: the name field and Create button share one line, and the
+   button lines up with the input instead of dropping to the next row. */
+.group-create {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.group-create label {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.group-create .btn {
+  flex: 0 0 auto;
+  min-height: 38px;
+}
+
+.group-methods-label {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.group-methods-empty {
+  margin: 0;
+  align-self: center;
+}
+
+/* Payment-method forms: provider select + optional custom label. */
+.method-create {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.method-create .form-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+.method-row .row-actions {
+  align-self: end;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+/* Export, Import, and Erase stay on one row at every width. */
+.data-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.data-actions .btn {
+  width: 100%;
+  padding-inline: 0.4rem;
+  font-size: 0.85rem;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+}
+
+#import-error {
+  margin: 0;
+}
+
+.dialog .stack.compact {
+  gap: 0.65rem;
+}
+
+/* Long names never widen a card or panel. */
+.card-value,
+.pill,
+.timeline-name {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
   .topbar {
     flex-wrap: wrap;
+    gap: 0.55rem;
   }
 
   .nav {
     width: 100%;
+    justify-content: space-between;
+    gap: 0.15rem;
+    padding: 0.16rem;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
   }
 
   .nav a {
-    flex: 0 0 auto;
+    flex: 1 0 auto;
+    padding: 0.45rem 0.5rem;
+    text-align: center;
   }
 
   .toolbar input[type="search"] {
     flex-basis: 100%;
   }
 
-  .subs-table td.actions-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem 0.9rem;
-    padding-top: 0.45rem;
-    border-top: 1px solid var(--line);
-    margin-top: 0.35rem;
+  .page-head {
+    align-items: flex-start;
+  }
+
+  .page-head-actions {
+    width: 100%;
+  }
+
+  .page-head-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .data-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 380px) {
+  .data-actions {
+    gap: 0.35rem;
+  }
+
+  .data-actions .btn {
+    font-size: 0.76rem;
+    padding: 0.45rem 0.2rem;
+  }
+
+  .nav a {
+    padding: 0.4rem 0.35rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  .container.wide {
+    max-width: 1320px;
   }
 }

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "region": "PH",
   "currency": "PHP",
-  "generatedAt": "2026-11-09T01:47:44.713+08:00",
+  "generatedAt": "2026-11-12T00:00:00+08:00",
   "fx": {
     "base": "USD",
     "rate": 63.064627,
@@ -1066,6 +1066,265 @@
             "priceText": "2.99",
             "sha256": "9068c4513954195453e85c7a37f5bc479120d77f33c8ae438130ce2692e5e300"
           }
+        }
+      ]
+    },
+    {
+      "key": "apple-arcade",
+      "name": "Apple Arcade",
+      "category": "gaming",
+      "site": "https://www.apple.com/ph/apple-arcade/",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "monthly",
+          "name": "Apple Arcade",
+          "amountCents": 36900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 36900,
+            "currency": "PHP",
+            "amountText": "₱369/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-arcade/",
+          "verifiedAt": "2026-11-12"
+        },
+        {
+          "id": "annual",
+          "name": "Apple Arcade (Annual)",
+          "amountCents": 249000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 249000,
+            "currency": "PHP",
+            "amountText": "₱2,490/year"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-arcade/",
+          "verifiedAt": "2026-11-12"
+        }
+      ]
+    },
+    {
+      "key": "apple-fitness-plus",
+      "name": "Apple Fitness+",
+      "category": "fitness",
+      "site": "https://www.apple.com/ph/apple-fitness-plus/",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "monthly",
+          "name": "Apple Fitness+",
+          "amountCents": 14900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 14900,
+            "currency": "PHP",
+            "amountText": "₱149/month"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-fitness-plus/",
+          "verifiedAt": "2026-11-12"
+        },
+        {
+          "id": "annual",
+          "name": "Apple Fitness+ (Annual)",
+          "amountCents": 119000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 119000,
+            "currency": "PHP",
+            "amountText": "₱1,190/year"
+          },
+          "sourceUrl": "https://www.apple.com/ph/apple-fitness-plus/",
+          "verifiedAt": "2026-11-12"
+        }
+      ]
+    },
+    {
+      "key": "viu",
+      "name": "Viu",
+      "category": "streaming",
+      "site": "https://www.viu.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "premium-30d",
+          "name": "Premium 30 days",
+          "amountCents": 14900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 14900,
+            "currency": "PHP",
+            "amountText": "₱149/30 days (DITO)"
+          },
+          "sourceUrl": "https://dito.ph/entertainment-partners/video/viu",
+          "verifiedAt": "2026-11-12"
+        },
+        {
+          "id": "premium-7d",
+          "name": "Premium 7 days",
+          "amountCents": 7900,
+          "currency": "PHP",
+          "cadence": "weekly",
+          "native": {
+            "amountCents": 7900,
+            "currency": "PHP",
+            "amountText": "₱79/7 days (DITO)"
+          },
+          "sourceUrl": "https://dito.ph/entertainment-partners/video/viu",
+          "verifiedAt": "2026-11-12"
+        }
+      ]
+    },
+    {
+      "key": "iqiyi",
+      "name": "iQIYI",
+      "category": "streaming",
+      "site": "https://www.iq.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "vip-monthly",
+          "name": "VIP 1 month",
+          "amountCents": 14500,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 14500,
+            "currency": "PHP",
+            "amountText": "₱145/month (DITO)"
+          },
+          "sourceUrl": "https://dito.ph/entertainment-partners/video/iqiyi",
+          "verifiedAt": "2026-11-12"
+        }
+      ]
+    },
+    {
+      "key": "wetv",
+      "name": "WeTV",
+      "category": "streaming",
+      "site": "https://wetv.vip",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "vip-monthly",
+          "name": "VIP 1 month",
+          "amountCents": 14900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 14900,
+            "currency": "PHP",
+            "amountText": "₱149/month (DITO)"
+          },
+          "sourceUrl": "https://dito.ph/entertainment-partners/video/wetv",
+          "verifiedAt": "2026-11-12"
+        }
+      ]
+    },
+    {
+      "key": "mubi",
+      "name": "MUBI",
+      "category": "streaming",
+      "site": "https://mubi.com",
+      "managePath": "/account",
+      "plans": [
+        {
+          "id": "classic-monthly",
+          "name": "MUBI Classic",
+          "amountCents": 39900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 39900,
+            "currency": "PHP",
+            "amountText": "₱399/month"
+          },
+          "sourceUrl": "https://mubi.com/en/ph/memberships",
+          "verifiedAt": "2026-11-12"
+        },
+        {
+          "id": "classic-annual",
+          "name": "MUBI Classic (Annual)",
+          "amountCents": 358800,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 358800,
+            "currency": "PHP",
+            "amountText": "₱3,588/year"
+          },
+          "sourceUrl": "https://mubi.com/en/ph/memberships",
+          "verifiedAt": "2026-11-12"
+        },
+        {
+          "id": "classic-student",
+          "name": "MUBI Classic Student",
+          "amountCents": 29900,
+          "currency": "PHP",
+          "cadence": "monthly",
+          "native": {
+            "amountCents": 29900,
+            "currency": "PHP",
+            "amountText": "₱299/month (student)"
+          },
+          "sourceUrl": "https://mubi.com/en/ph/memberships",
+          "verifiedAt": "2026-11-12"
+        }
+      ]
+    },
+    {
+      "key": "strava",
+      "name": "Strava",
+      "category": "fitness",
+      "site": "https://www.strava.com",
+      "managePath": "/settings",
+      "plans": [
+        {
+          "id": "individual-annual",
+          "name": "Individual (Annual)",
+          "amountCents": 150000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 150000,
+            "currency": "PHP",
+            "amountText": "₱1,500/year"
+          },
+          "sourceUrl": "https://www.strava.com/subscribe",
+          "verifiedAt": "2026-11-12"
+        },
+        {
+          "id": "family-annual",
+          "name": "Family (Annual, 4 accounts)",
+          "amountCents": 449900,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 449900,
+            "currency": "PHP",
+            "amountText": "₱4,499/year"
+          },
+          "sourceUrl": "https://www.strava.com/subscribe",
+          "verifiedAt": "2026-11-12"
+        },
+        {
+          "id": "student-annual",
+          "name": "Student (Annual)",
+          "amountCents": 75000,
+          "currency": "PHP",
+          "cadence": "annual",
+          "native": {
+            "amountCents": 75000,
+            "currency": "PHP",
+            "amountText": "₱750/year"
+          },
+          "sourceUrl": "https://www.strava.com/subscribe",
+          "verifiedAt": "2026-11-12"
         }
       ]
     }
