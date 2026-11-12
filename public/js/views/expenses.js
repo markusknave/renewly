@@ -33,22 +33,22 @@ function rowHtml(transaction, methods) {
 	const title =
 		transaction.type === 'interest'
 			? 'Interest earned'
-			: transaction.type === 'income'
-				? 'Income'
-				: transaction.merchant;
+			: transaction.merchant || TYPE_LABELS[transaction.type] || 'Entry';
 	const detail =
 		transaction.type === 'expense'
 			? `${categoryLabel(transaction.category)}${method ? ` · ${method.label}` : ''}`
-			: transaction.type === 'interest'
-				? `${method ? method.label : 'Payment method'} · automatic`
-				: `${TYPE_LABELS[transaction.type]}${method ? ` · ${method.label}` : ''}`;
+			: transaction.type === 'income'
+				? `Income${method ? ` · ${method.label}` : ''}`
+				: transaction.type === 'interest'
+					? `${method ? method.label : 'Payment method'} · automatic`
+					: `${TYPE_LABELS[transaction.type]}${method ? ` · ${method.label}` : ''}`;
 	const search = `${title} ${detail} ${transaction.notes || ''}`.toLowerCase();
-	const editable = transaction.type === 'expense';
+	const editable = transaction.type === 'expense' || transaction.type === 'income';
 	return `<li class="txn-row" data-txn data-type="${esc(transaction.type)}" data-category="${esc(
 		transaction.category || ''
 	)}" data-method="${esc(transaction.paymentMethodId ?? '')}" data-search="${esc(search)}" data-expense-amount="${
 		transaction.type === 'expense' ? transaction.amountCents : 0
-	}">
+	}" data-income-amount="${transaction.type === 'income' ? transaction.amountCents : 0}">
 		${badge(transaction)}
 		<div class="txn-main">
 			<strong>${esc(title)}</strong>
@@ -75,7 +75,7 @@ function rowHtml(transaction, methods) {
 
 function groupedList(rows, methods) {
 	if (!rows.length) {
-		return `<div class="empty"><h3>No transactions in this range</h3><p class="muted">Adjust the dates or add an expense.</p><button class="btn btn-primary" type="button" data-action="new-expense">Add expense</button></div>`;
+		return `<div class="empty"><h3>No transactions in this range</h3><p class="muted">Adjust the dates or add an expense or income entry.</p><button class="btn btn-primary" type="button" data-action="new-expense">Add transaction</button></div>`;
 	}
 	const groups = new Map();
 	for (const transaction of rows) {
@@ -105,13 +105,19 @@ export function expenseDialog({ methods = [], today }) {
 			<button class="icon-btn" type="button" data-action="close-expense" aria-label="Close">${icon('close')}</button>
 		</div>
 		<form class="stack" data-form="expense" data-id="">
+			<label>Type
+				<select name="type" data-expense-type>
+					<option value="expense" selected>Expense</option>
+					<option value="income">Income</option>
+				</select>
+			</label>
 			<div class="grid-2">
 				<label>Date<input type="date" name="date" required value="${esc(today)}" /></label>
 				<label>Amount (PHP)<input type="text" name="amount" inputmode="decimal" required placeholder="0.00" /></label>
 			</div>
-			<label>Description<input type="text" name="merchant" maxlength="60" required placeholder="Lunch, Grab, Meralco…" /></label>
+			<label>Description<input type="text" name="merchant" maxlength="60" required placeholder="Lunch, Grab, Salary…" /></label>
 			<div class="grid-2">
-				<label>Category<select name="category">${options(
+				<label data-expense-category-field>Category<select name="category">${options(
 					EXPENSE_CATEGORIES.map((category) => category.key),
 					'other',
 					Object.fromEntries(EXPENSE_CATEGORIES.map((category) => [category.key, category.label]))
@@ -132,10 +138,10 @@ export function expenseDialog({ methods = [], today }) {
 			</div>
 			<label>Notes<textarea name="notes" rows="2" maxlength="500" placeholder="Optional"></textarea></label>
 			<p class="banner banner-error" data-dialog-error role="alert" hidden></p>
-			<p class="hint">Saving subtracts the amount from the selected card or wallet. Interest and goal transfers stay automatic.</p>
+			<p class="hint" data-expense-hint>Saving subtracts the amount from the selected card or wallet. Interest and goal transfers stay automatic.</p>
 			<div class="form-actions">
 				<button class="btn" type="button" data-action="close-expense">Cancel</button>
-				<button class="btn btn-primary" type="submit">Save expense</button>
+				<button class="btn btn-primary" type="submit" data-expense-submit>Save expense</button>
 			</div>
 		</form>
 	</dialog>`;
@@ -154,12 +160,12 @@ export function expensesView({
 	return `<div class="page-head">
 		<div>
 			<p class="eyebrow">Expense tracker</p>
-			<h1>Spending</h1>
-			<p class="muted">Every purchase, bill, and fee, with exports for the range you choose.</p>
+			<h1>Transactions</h1>
+			<p class="muted">Every expense and income entry, with exports for the range you choose.</p>
 		</div>
 		<div class="page-head-actions">
 			<a class="btn" href="#/import">${icon('download')} Import</a>
-			<button class="btn btn-primary" type="button" data-action="new-expense">${icon('plus')} Add expense</button>
+			<button class="btn btn-primary" type="button" data-action="new-expense">${icon('plus')} Add transaction</button>
 		</div>
 	</div>
 
@@ -172,6 +178,11 @@ export function expensesView({
 			)}</select></label>
 			<label>From<input type="date" data-expense-from value="${esc(range.from)}" /></label>
 			<label>To<input type="date" data-expense-to value="${esc(range.to)}" /></label>
+			<label>Type<select data-expense-type-filter>${options(
+				['', 'expense', 'income'],
+				filters.type || '',
+				{ '': 'All types', expense: 'Expenses', income: 'Income' }
+			)}</select></label>
 			<label>Category<select data-expense-category>
 				<option value="">All categories</option>
 				${categories
@@ -204,6 +215,10 @@ export function expensesView({
 					summary.count === 1 ? '' : 's'
 				} · <span data-expense-total>${esc(
 					formatMoney(summary.expenseCents, 'PHP')
+				)}</span> · <span data-income-count>${summary.incomeCount ?? 0}</span> income · <span data-income-total>${esc(
+					formatMoney(summary.incomeCents, 'PHP')
+				)}</span> · Net <span data-net-total>${esc(
+					formatMoney(summary.incomeCents - summary.expenseCents, 'PHP')
 				)}</span></span>
 				<span class="muted tiny">Exports include interest and goal transfers in this range.</span>
 			</div>

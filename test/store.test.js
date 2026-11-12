@@ -24,6 +24,7 @@ import {
   saveSettings,
   validateSubscriptionInput,
   summarize,
+  saveExpense,
 } from '../public/js/store.js';
 
 function subscriptionInput(overrides = {}) {
@@ -303,6 +304,37 @@ test('savePaymentMethod validates its fields', async () => {
   await assert.rejects(() => savePaymentMethod(db, {}), /Label is required/);
   await assert.rejects(() => savePaymentMethod(db, { label: 'X', kind: 'crypto' }), /not recognized/);
   await assert.rejects(() => savePaymentMethod(db, { label: 'X', last4: '12345' }), /4 characters/);
+});
+
+test('saveExpense stores expenses and income separately', async () => {
+  const db = createMemoryBackend();
+  const method = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card' });
+  const income = await saveExpense(db, {
+    type: 'income',
+    date: '2026-11-13',
+    merchant: 'Salary',
+    amountCents: 50_000,
+    category: 'food',
+    paymentMethodId: method.id,
+  });
+  assert.equal(income.type, 'income');
+  assert.equal(income.category, 'income');
+
+  const expense = await saveExpense(db, {
+    type: 'expense',
+    date: '2026-11-13',
+    merchant: 'Lunch',
+    amountCents: 12_500,
+    category: 'food',
+    paymentMethodId: method.id,
+  });
+  assert.equal(expense.type, 'expense');
+  assert.equal(expense.category, 'food');
+
+  await assert.rejects(
+    () => saveExpense(db, { type: 'refund', date: '2026-11-13', merchant: 'Bad', amountCents: 1 }),
+    /Type must be expense or income/
+  );
 });
 
 test('settings return defaults and merge patches', async () => {

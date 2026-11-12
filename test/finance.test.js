@@ -261,6 +261,7 @@ test('period summaries split categories, methods, and net cash flow', () => {
 		{ type: 'expense', date: '2026-11-01', amountCents: 10_000, category: 'food', paymentMethodId: 1, merchant: 'A' },
 		{ type: 'expense', date: '2026-11-02', amountCents: 20_000, category: 'food', paymentMethodId: 2, merchant: 'B' },
 		{ type: 'expense', date: '2026-11-03', amountCents: 5_000, category: 'transport', paymentMethodId: 1, merchant: 'C' },
+		{ type: 'income', date: '2026-11-03', amountCents: 100_000, category: 'income', paymentMethodId: 1, merchant: 'Salary' },
 		{ type: 'interest', date: '2026-11-03', amountCents: 500, paymentMethodId: 1, auto: true },
 		{ type: 'goal_deposit', date: '2026-11-04', amountCents: 1_000, paymentMethodId: 1, goalId: 1 },
 		{ type: 'expense', date: '2026-12-01', amountCents: 99_999, category: 'food', paymentMethodId: 1 },
@@ -268,14 +269,16 @@ test('period summaries split categories, methods, and net cash flow', () => {
 	const summary = summarizePeriod(transactions, { from: '2026-11-01', to: '2026-11-30' });
 	assert.equal(summary.expenseCents, 35_000);
 	assert.equal(summary.count, 3);
+	assert.equal(summary.incomeCents, 100_000);
+	assert.equal(summary.incomeCount, 1);
 	assert.equal(summary.interestCents, 500);
-	assert.equal(summary.netCents, -34_500);
+	assert.equal(summary.netCents, 65_500);
 	assert.equal(summary.categories[0].key, 'food');
 	assert.equal(summary.categories[0].amountCents, 30_000);
 	assert.equal(summary.categories[1].key, 'transport');
 	assert.equal(summary.methodTotals.length, 2);
 	assert.equal(summary.topMerchant.merchant, 'B');
-	assert.equal(summary.rows.length, 5);
+	assert.equal(summary.rows.length, 6);
 });
 
 test('total balance includes pending interest', () => {

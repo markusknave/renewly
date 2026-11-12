@@ -136,6 +136,36 @@ test('expenses screen renders filters, exports, ledger rows, and the add dialog'
 	assert.match(html, /data-dialog-error/);
 });
 
+test('expenses screen differentiates income and expenses', () => {
+	const income = {
+		id: 4,
+		type: 'income',
+		date: '2026-11-09',
+		amountCents: 5_000_000,
+		category: 'income',
+		paymentMethodId: 1,
+		merchant: 'Salary',
+	};
+	const rows = [...transactions, income];
+	const range = monthRange(today);
+	const html = expensesView({
+		today,
+		methods,
+		filters: { preset: 'this_month', query: '', type: '', category: '', methodId: '' },
+		range,
+		summary: summarizePeriod(rows, range),
+		rows,
+	});
+	assert.match(html, /data-expense-type-filter/);
+	assert.match(html, /<option value="income">Income<\/option>/);
+	assert.match(html, /data-income-amount="5000000"/);
+	assert.match(html, /data-income-total/);
+	assert.match(html, /data-net-total/);
+	assert.match(html, /Salary/);
+	assert.match(html, /name="type" data-expense-type/);
+	assert.match(html, /data-expense-submit/);
+});
+
 test('goals screen renders progress, feasibility copy, and both dialogs', () => {
 	const html = goalsView({ today, methods, goals, goalRows, transactions });
 	assert.match(html, /class="goal-card"/);
@@ -193,6 +223,7 @@ test('import review renders the drop zone, analyst summary, and commit form', ()
 			format: 'CSV',
 			rows: [
 				{
+					type: 'expense',
 					date: '2026-11-01',
 					merchant: 'Jollibee',
 					amountCents: 12_550,
@@ -203,6 +234,18 @@ test('import review renders the drop zone, analyst summary, and commit form', ()
 					duplicate: false,
 				},
 				{
+					type: 'income',
+					date: '2026-11-02',
+					merchant: 'Salary',
+					amountCents: 50_000,
+					category: 'income',
+					notes: '',
+					paymentMethodId: 1,
+					methodLabel: 'MariBank',
+					duplicate: false,
+				},
+				{
+					type: 'expense',
 					date: '2026-11-02',
 					merchant: 'Uniqlo',
 					amountCents: 89_900,
@@ -213,14 +256,18 @@ test('import review renders the drop zone, analyst summary, and commit form', ()
 					duplicate: true,
 				},
 			],
-			stats: { total: 2, valid: 1, invalid: 0, duplicates: 1, creditsSkipped: 0 },
+			stats: { total: 3, valid: 2, invalid: 0, duplicates: 1, expenseCount: 2, incomeCount: 1, expenseCents: 102_450, incomeCents: 50_000 },
 			warnings: ['1 row already exists and is excluded by default.'],
 			analysis: {
-				count: 1,
-				totalCents: 12_550,
+				count: 2,
+				expenseCount: 1,
+				incomeCount: 1,
+				expenseCents: 12_550,
+				incomeCents: 50_000,
+				netCents: 37_450,
 				categories: [{ key: 'food', label: 'Food & drinks', amountCents: 12_550, share: 100 }],
 				from: '2026-11-01',
-				to: '2026-11-01',
+				to: '2026-11-02',
 			},
 		},
 	});
@@ -228,8 +275,11 @@ test('import review renders the drop zone, analyst summary, and commit form', ()
 	assert.match(html, /data-form="import-expenses"/);
 	assert.match(html, /Re-run analyst/);
 	assert.match(html, /Jollibee/);
+	assert.match(html, /Salary/);
+	assert.match(html, /Income/);
 	assert.match(html, /Duplicate/);
-	assert.match(html, /Import 1 expense/);
+	assert.match(html, /data-import-type/);
+	assert.match(html, /Import 2 transactions/);
 	assert.match(html, /Analyst top category/);
 });
 

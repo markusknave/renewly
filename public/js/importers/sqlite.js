@@ -3,7 +3,7 @@
 // ZINOUTCOME/INOUTCOME rows and resolves categories and accounts by UID.
 
 import { readZip } from './xlsx.js';
-import { detectCategory } from '../lib/categories.js';
+import { detectCategory, INCOME_CATEGORY } from '../lib/categories.js';
 import { matchMethod, parseAnyDate, parseMoney, mapCategory, duplicateKey } from './table.js';
 
 const textDecoder = new TextDecoder('utf-8');
@@ -363,10 +363,10 @@ export async function readMmbak(bytes, options = {}) {
 
 	const existingKeys = new Set(
 		(existing || [])
-			.filter((row) => row && row.type === 'expense')
+			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
 			.map((row) =>
 				duplicateKey(
-					{ date: row.date, amountCents: row.amountCents, merchant: row.merchant },
+					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
 					row.paymentMethodId ?? null
 				)
 			)
@@ -374,16 +374,16 @@ export async function readMmbak(bytes, options = {}) {
 	const seen = new Set();
 	const transactions = [];
 	let invalid = 0;
-	let creditsSkipped = 0;
 	let duplicates = 0;
+	let expenseCount = 0;
+	let incomeCount = 0;
+	let expenseCents = 0;
+	let incomeCents = 0;
 
 	for (const row of txnTable.rows) {
 		if (deletedCol && isDeleted(row[deletedCol])) continue;
 		const kind = kindOf(valueOf(row, typeCol));
-		if (kind !== 'expense') {
-			if (kind === 'income') creditsSkipped += 1;
-			continue;
-		}
+		if (kind !== 'expense' && kind !== 'income') continue;
 		const date = parseAnyDate(valueOf(row, dateCol));
 		const amountValue = valueOf(row, amountCol);
 		const amountCents = typeof amountValue === 'number'
@@ -400,10 +400,13 @@ export async function readMmbak(bytes, options = {}) {
 		).trim();
 		const assetText = String(assets.get(String(valueOf(row, assetFk) ?? '')) || '').trim();
 		const memo = String(valueOf(row, memoCol) ?? '').trim();
-		const merchant = (memo || categoryText || assetText || 'Imported expense').slice(0, 60);
-		const category = mapCategory(categoryText) || detectCategory(`${merchant} ${memo}`) || 'other';
+		const merchant = (memo || categoryText || assetText || (kind === 'income' ? 'Imported income' : 'Imported expense')).slice(0, 60);
+		const category = kind === 'income'
+			? INCOME_CATEGORY
+			: mapCategory(categoryText) || detectCategory(`${merchant} ${memo}`) || 'other';
 		const paymentMethodId = matchMethod(assetText, methods) ?? defaultMethodId ?? null;
 		const transaction = {
+			type: kind,
 			date,
 			merchant,
 			amountCents,
@@ -413,6 +416,13 @@ export async function readMmbak(bytes, options = {}) {
 			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
 			source: 'Money Manager import',
 		};
+		if (kind === 'income') {
+			incomeCount += 1;
+			incomeCents += amountCents;
+		} else {
+			expenseCount += 1;
+			expenseCents += amountCents;
+		}
 		const key = duplicateKey(transaction, paymentMethodId);
 		if (existingKeys.has(key) || seen.has(key)) {
 			transaction.duplicate = true;
@@ -429,7 +439,10 @@ export async function readMmbak(bytes, options = {}) {
 			valid: transactions.filter((row) => !row.duplicate).length,
 			invalid,
 			duplicates,
-			creditsSkipped,
+			expenseCount,
+			incomeCount,
+			expenseCents,
+			incomeCents,
 		},
 		warnings: categoryTable && assetTable ? [] : ['Some category or account names could not be resolved from the backup.'],
 	};

@@ -12,20 +12,24 @@ function statusPill(row) {
 }
 
 function previewRows(rows) {
-	if (!rows.length) return '<p class="muted small">No expense rows were recognized.</p>';
+	if (!rows.length) return '<p class="muted small">No transaction rows were recognized.</p>';
 	return `<div class="table-wrap"><table class="subs-table import-table">
-		<thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Method</th><th>Amount</th><th>Status</th></tr></thead>
+		<thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Category</th><th>Method</th><th>Amount</th><th>Status</th></tr></thead>
 		<tbody>${rows
 			.slice(0, 100)
 			.map(
-				(row) => `<tr>
+				(row, index) => `<tr>
 					<td class="num">${esc(row.date)}</td>
 					<td><span class="merchant-name">${esc(row.merchant)}</span>${
 						row.notes ? `<span class="sub">${esc(row.notes.slice(0, 80))}</span>` : ''
 					}</td>
+					<td><select data-import-type data-index="${index}">
+						<option value="expense"${row.type === 'income' ? '' : ' selected'}>Expense</option>
+						<option value="income"${row.type === 'income' ? ' selected' : ''}>Income</option>
+					</select></td>
 					<td>${esc(categoryLabel(row.category))}</td>
 					<td>${esc(row.methodLabel || 'Default')}</td>
-					<td class="num">${esc(formatMoney(row.amountCents, 'PHP'))}</td>
+					<td class="num">${row.type === 'income' ? '+' : '−'}${esc(formatMoney(row.amountCents, 'PHP'))}</td>
 					<td>${statusPill(row)}</td>
 				</tr>`
 			)
@@ -36,8 +40,13 @@ function previewRows(rows) {
 function analysisPanel(analysis) {
 	if (!analysis.count) return '';
 	return `<section class="import-analysis">
-		<div><span class="muted small">Expenses</span><strong>${analysis.count}</strong></div>
-		<div><span class="muted small">Total</span><strong>${esc(formatMoney(analysis.totalCents, 'PHP'))}</strong></div>
+		<div><span class="muted small">Expenses</span><strong>${analysis.expenseCount} · ${esc(
+			formatMoney(analysis.expenseCents, 'PHP')
+		)}</strong></div>
+		<div><span class="muted small">Income</span><strong>${analysis.incomeCount} · ${esc(
+			formatMoney(analysis.incomeCents, 'PHP')
+		)}</strong></div>
+		<div><span class="muted small">Net</span><strong>${esc(formatMoney(analysis.netCents, 'PHP'))}</strong></div>
 		<div><span class="muted small">Range</span><strong class="small-value">${esc(
 			formatDateHuman(analysis.from)
 		)} – ${esc(formatDateHuman(analysis.to))}</strong></div>
@@ -55,12 +64,12 @@ export function importView({ methods = [], preview = null, busy = false, default
 	const duplicateCount = rows.filter((row) => row.duplicate).length;
 	const stats = preview?.stats || null;
 
-	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Import expenses' }])}
+	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Import transactions' }])}
 	<div class="page-head">
 		<div>
 			<p class="eyebrow">More · Import</p>
-			<h1>Import expenses</h1>
-			<p class="muted">Read a statement, preview what Renewly understood, then add the expenses. Everything stays on this device.</p>
+			<h1>Import transactions</h1>
+			<p class="muted">Read a statement, preview what Renewly understood, then add expenses and income. Everything stays on this device.</p>
 		</div>
 		<div class="page-head-actions"><a class="btn" href="#/expenses">Back to expenses</a></div>
 	</div>
@@ -87,8 +96,9 @@ export function importView({ methods = [], preview = null, busy = false, default
 				<section class="import-stats">
 					<div><span class="muted small">Rows read</span><strong>${stats?.total ?? rows.length}</strong></div>
 					<div><span class="muted small">Ready</span><strong>${ready}</strong></div>
+					<div><span class="muted small">Expenses</span><strong>${stats?.expenseCount ?? 0}</strong></div>
+					<div><span class="muted small">Income</span><strong>${stats?.incomeCount ?? 0}</strong></div>
 					<div><span class="muted small">Duplicates</span><strong>${duplicateCount}</strong></div>
-					<div><span class="muted small">Credits skipped</span><strong>${stats?.creditsSkipped ?? 0}</strong></div>
 				</section>
 				${analysisPanel(preview.analysis)}
 				${
@@ -118,7 +128,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 							<button class="btn" type="button" data-action="clear-import">Clear</button>
 						</div>
 					</div>
-					<p class="hint">The analyst matched categories from the description and notes. You can edit any imported expense after it is added.</p>
+					<p class="hint">The analyst matched categories from the description and notes. Use the Type column to correct a row before importing; you can also edit any imported transaction afterward.</p>
 					${previewRows(rows)}
 					${
 						rows.length > 100
@@ -126,7 +136,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 							: ''
 					}
 					<div class="form-actions">
-						<button class="btn btn-primary" type="submit"${ready ? '' : ' disabled'}>Import ${ready} expense${
+						<button class="btn btn-primary" type="submit"${ready ? '' : ' disabled'}>Import ${ready} transaction${
 							ready === 1 ? '' : 's'
 						}</button>
 					</div>
@@ -136,7 +146,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 				<div class="panel-head"><h2>How matching works</h2></div>
 				<ul class="tight">
 					<li>Dates are read from ISO, local, month-name, epoch, and Excel serial formats.</li>
-					<li>Debit and withdrawal rows become expenses; credit and deposit rows are skipped.</li>
+					<li>Debit, withdrawal, and expense rows become expenses; credit, deposit, salary, and income rows become income.</li>
 					<li>Categories come from the file when present, otherwise the local analyst's keywords infer them.</li>
 					<li>Account or card names are matched to your saved payment methods; unmatched rows use the default you pick.</li>
 					<li>Rows already in the ledger are marked as duplicates and excluded.</li>

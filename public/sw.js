@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renewly-shell-v8';
+const CACHE_NAME = 'renewly-shell-v9';
 const APP_ASSETS = [
 	'./',
 	'./index.html',

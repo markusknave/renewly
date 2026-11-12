@@ -14,7 +14,7 @@ import {
 	MAX_TRANSACTION_NOTES,
 	saveSettings,
 } from './store.js';
-import { CATEGORY_KEYS } from './lib/categories.js';
+import { CATEGORY_KEYS, INCOME_CATEGORY } from './lib/categories.js';
 import { INSTRUMENTS } from './lib/cardThemes.js';
 import { INTEREST_FREQUENCIES, TRANSACTION_TYPES } from './finance.js';
 
@@ -269,7 +269,9 @@ export function normalizeBackup(parsed) {
 				amountCents: amount,
 				oldPaymentMethodId: transaction.paymentMethodId ?? null,
 				oldGoalId: transaction.goalId ?? null,
-				category: CATEGORY_KEYS.includes(transaction.category) ? transaction.category : 'other',
+				category: type === 'income'
+					? INCOME_CATEGORY
+					: CATEGORY_KEYS.includes(transaction.category) ? transaction.category : 'other',
 				merchant: text(transaction.merchant, MAX_EXPENSE_MERCHANT) || (type === 'interest' ? 'Interest earned' : 'Entry'),
 				notes: text(transaction.notes, MAX_TRANSACTION_NOTES),
 				auto,
