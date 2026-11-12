@@ -1,3 +1,12 @@
+import { CATEGORY_KEYS } from './lib/categories.js';
+import {
+	INTEREST_FREQUENCIES,
+	TRANSACTION_TYPES,
+	goalSavedCents,
+	methodSnapshot,
+	sortTransactions,
+} from './finance.js';
+
 export const CADENCES = ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom'];
 export const STATUSES = ['active', 'trial', 'paused', 'canceled'];
 export const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'cash', 'other'];
@@ -25,8 +34,13 @@ const DEFAULT_SETTINGS = {
 export const MAX_DISPLAY_NAME = 25;
 export const MAX_GROUP_NAME_LENGTH = 25;
 export const MAX_METHOD_LABEL_LENGTH = 60;
+export const MAX_EXPENSE_MERCHANT = 60;
+export const MAX_GOAL_NAME = 40;
+export const MAX_TRANSACTION_NOTES = 500;
+export const GOAL_COLORS = ['indigo', 'teal', 'amber', 'rose', 'sky', 'violet'];
 const MAX_NAME_LENGTH = 120;
 const MAX_NOTES_LENGTH = 2000;
+const MAX_RATE_BPS = 10_000;
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -379,9 +393,54 @@ function validatePaymentMethodInput(input) {
     errors.notes = `Notes must be ${MAX_NOTES_LENGTH} characters or fewer.`;
   }
 
+  const rawOpening = source.openingBalanceCents === undefined || source.openingBalanceCents === null
+    || source.openingBalanceCents === ''
+    ? 0
+    : typeof source.openingBalanceCents === 'string'
+      ? Number(source.openingBalanceCents)
+      : source.openingBalanceCents;
+  if (!Number.isInteger(rawOpening) || rawOpening < 0) {
+    errors.openingBalanceCents = 'Starting balance must be a whole number of cents (0 or more).';
+  }
+  const openingBalanceCents = Number.isInteger(rawOpening) && rawOpening >= 0 ? rawOpening : 0;
+
+  const openingDate = normalizeDate(source.openingDate, errors, 'openingDate', 'Balance date');
+
+  const rawRate = source.interestRateBps === undefined || source.interestRateBps === null
+    || source.interestRateBps === ''
+    ? 0
+    : typeof source.interestRateBps === 'string'
+      ? Number(source.interestRateBps)
+      : source.interestRateBps;
+  if (!Number.isInteger(rawRate) || rawRate < 0 || rawRate > MAX_RATE_BPS) {
+    errors.interestRateBps = 'Interest rate must be a whole number of basis points between 0 and 10000.';
+  }
+  const interestRateBps = Number.isInteger(rawRate) && rawRate >= 0 && rawRate <= MAX_RATE_BPS ? rawRate : 0;
+
+  const rawFrequency = source.interestFrequency === undefined || source.interestFrequency === null
+    || source.interestFrequency === ''
+    ? 'none'
+    : source.interestFrequency;
+  if (!INTEREST_FREQUENCIES.includes(rawFrequency)) {
+    errors.interestFrequency = 'Interest frequency must be none, daily, or monthly.';
+  }
+  const interestFrequency = INTEREST_FREQUENCIES.includes(rawFrequency) ? rawFrequency : 'none';
+
+  const network = ['visa', 'mastercard', 'other'].includes(source.network) ? source.network : '';
+
   const id = normalizeId(source.id, errors);
 
-  const data = { label, kind, last4, notes };
+  const data = {
+    label,
+    kind,
+    last4,
+    notes,
+    openingBalanceCents,
+    openingDate,
+    interestRateBps,
+    interestFrequency,
+    network,
+  };
   if (id) data.id = id;
 
   return { errors, data };
@@ -473,6 +532,7 @@ export async function savePaymentMethod(db, input) {
   const existing = id ? await db.get('paymentMethods', id) : undefined;
   const record = { ...data };
   record.createdAt = existing && existing.createdAt ? existing.createdAt : now;
+  record.updatedAt = now;
 
   if (id) record.id = id;
   const key = await db.put('paymentMethods', record);
@@ -495,6 +555,22 @@ export async function deletePaymentMethod(db, id) {
     subscription.paymentMethodId = null;
     subscription.updatedAt = now;
     await db.put('subscriptions', subscription);
+  }
+
+  // Interest rows belong to the deleted method; spend and goal history stays,
+  // with the method reference cleared so the ledger remains intact.
+  const transactions = await db.getAll('transactions');
+  for (const transaction of transactions) {
+    if (Number(transaction.paymentMethodId) !== key) continue;
+    if (transaction.auto && transaction.type === 'interest') {
+      await db.delete('transactions', transaction.id);
+      continue;
+    }
+    await db.put('transactions', {
+      ...transaction,
+      paymentMethodId: null,
+      updatedAt: now,
+    });
   }
   return true;
 }
@@ -662,4 +738,255 @@ export function summarize(subscriptions, options = {}) {
     dueSoon,
     overdue,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Expense ledger, goals, and in-app transfers
+// ---------------------------------------------------------------------------
+
+export function validateExpenseInput(input) {
+  const errors = {};
+  const source = isPlainObject(input) ? input : {};
+  if (!isPlainObject(input)) errors.form = 'Expense details are required.';
+
+  const date = normalizeDate(source.date, errors, 'date', 'Date');
+  if (!date) errors.date = 'Date is required (YYYY-MM-DD).';
+
+  const merchant = trimString(source.merchant);
+  if (!merchant) {
+    errors.merchant = 'Description is required.';
+  } else if (merchant.length > MAX_EXPENSE_MERCHANT) {
+    errors.merchant = `Description must be ${MAX_EXPENSE_MERCHANT} characters or fewer.`;
+  }
+
+  const category = trimString(source.category) || 'other';
+  if (!CATEGORY_KEYS.includes(category)) errors.category = 'Category is not recognized.';
+
+  const rawAmount = typeof source.amountCents === 'string' && source.amountCents.trim()
+    ? Number(source.amountCents)
+    : source.amountCents;
+  if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
+    errors.amountCents = 'Amount must be a whole number of cents greater than 0.';
+  }
+
+  const notes = trimString(source.notes);
+  if (notes.length > MAX_TRANSACTION_NOTES) {
+    errors.notes = `Notes must be ${MAX_TRANSACTION_NOTES} characters or fewer.`;
+  }
+
+  let paymentMethodId = null;
+  if (source.paymentMethodId !== undefined && source.paymentMethodId !== null && source.paymentMethodId !== '') {
+    const rawId = typeof source.paymentMethodId === 'string' ? Number(source.paymentMethodId) : source.paymentMethodId;
+    if (Number.isInteger(rawId) && rawId > 0) paymentMethodId = rawId;
+    else errors.paymentMethodId = 'Payment method is not valid.';
+  }
+
+  const id = normalizeId(source.id, errors);
+
+  const data = {
+    type: 'expense',
+    date,
+    merchant,
+    category,
+    amountCents: Number.isInteger(rawAmount) && rawAmount > 0 ? rawAmount : 0,
+    paymentMethodId,
+    notes,
+  };
+  if (id) data.id = id;
+
+  return { errors, data };
+}
+
+export async function listTransactions(db) {
+  return sortTransactions(await db.getAll('transactions'));
+}
+
+export async function getTransaction(db, id) {
+  const key = toKey(id);
+  if (key === null) return undefined;
+  return db.get('transactions', key);
+}
+
+export async function saveExpense(db, input) {
+  const { errors, data } = validateExpenseInput(input);
+
+  if (!errors.paymentMethodId && data.paymentMethodId !== null) {
+    const method = await db.get('paymentMethods', data.paymentMethodId);
+    if (!method) errors.paymentMethodId = 'Payment method not found.';
+  }
+
+  throwIfErrors(errors);
+
+  const now = new Date().toISOString();
+  const id = data.id || 0;
+  const existing = id ? await db.get('transactions', id) : undefined;
+  const record = {
+    ...data,
+    goalId: null,
+    auto: false,
+    autoKey: null,
+    createdAt: existing && existing.createdAt ? existing.createdAt : now,
+    updatedAt: now,
+  };
+  if (id) record.id = id;
+  const key = await db.put('transactions', record);
+  if (!id) record.id = key;
+  return record;
+}
+
+export async function deleteExpense(db, id) {
+  const key = toKey(id);
+  if (key === null) return false;
+  const existing = await db.get('transactions', key);
+  if (!existing) return false;
+  if (existing.auto) return false;
+  await db.delete('transactions', key);
+  return true;
+}
+
+export function validateGoalInput(input) {
+  const errors = {};
+  const source = isPlainObject(input) ? input : {};
+  if (!isPlainObject(input)) errors.form = 'Goal details are required.';
+
+  const name = trimString(source.name);
+  if (!name) {
+    errors.name = 'Goal name is required.';
+  } else if (name.length > MAX_GOAL_NAME) {
+    errors.name = `Goal name must be ${MAX_GOAL_NAME} characters or fewer.`;
+  }
+
+  const rawTarget = typeof source.targetCents === 'string' && source.targetCents.trim()
+    ? Number(source.targetCents)
+    : source.targetCents;
+  if (!Number.isInteger(rawTarget) || rawTarget <= 0) {
+    errors.targetCents = 'Target must be a whole number of cents greater than 0.';
+  }
+
+  const deadline = normalizeDate(source.deadline, errors, 'deadline', 'Target date');
+  const note = trimString(source.note);
+  if (note.length > 200) errors.note = 'Note must be 200 characters or fewer.';
+  const color = GOAL_COLORS.includes(source.color) ? source.color : 'indigo';
+  const id = normalizeId(source.id, errors);
+
+  const data = {
+    name,
+    targetCents: Number.isInteger(rawTarget) && rawTarget > 0 ? rawTarget : 0,
+    deadline,
+    note,
+    color,
+  };
+  if (id) data.id = id;
+
+  return { errors, data };
+}
+
+export async function listGoals(db) {
+  const rows = await db.getAll('goals');
+  return rows.sort((a, b) => {
+    const dateA = a.deadline || '9999-12-31';
+    const dateB = b.deadline || '9999-12-31';
+    if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+    return (a.id || 0) - (b.id || 0);
+  });
+}
+
+export async function saveGoal(db, input) {
+  const { errors, data } = validateGoalInput(input);
+  throwIfErrors(errors);
+
+  const goals = await db.getAll('goals');
+  const nameKey = data.name.toLocaleLowerCase();
+  const duplicate = goals.find(
+    (goal) => goal.id !== data.id && String(goal.name || '').trim().toLocaleLowerCase() === nameKey
+  );
+  if (duplicate) throw new Error('A goal with that name already exists.');
+
+  const now = new Date().toISOString();
+  const id = data.id || 0;
+  const existing = id ? await db.get('goals', id) : undefined;
+  if (id && !existing) throw new Error('Goal not found.');
+  const record = { ...data };
+  record.createdAt = existing && existing.createdAt ? existing.createdAt : now;
+  record.updatedAt = now;
+
+  if (id) record.id = id;
+  const key = await db.put('goals', record);
+  if (!id) record.id = key;
+  return record;
+}
+
+export async function deleteGoal(db, id) {
+  const key = toKey(id);
+  if (key === null) return false;
+  const existing = await db.get('goals', key);
+  if (!existing) return false;
+
+  const transactions = await db.getAll('transactions');
+  for (const transaction of transactions) {
+    if (Number(transaction.goalId) !== key) continue;
+    await db.delete('transactions', transaction.id);
+  }
+  await db.delete('goals', key);
+  return true;
+}
+
+export async function saveGoalTransfer(db, input) {
+  const source = isPlainObject(input) ? input : {};
+  const errors = {};
+
+  const goalId = toKey(source.goalId);
+  if (goalId === null) errors.goalId = 'Goal is required.';
+  const paymentMethodId = toKey(source.paymentMethodId);
+  if (paymentMethodId === null) errors.paymentMethodId = 'Payment method is required.';
+
+  const rawAmount = typeof source.amountCents === 'string' && source.amountCents.trim()
+    ? Number(source.amountCents)
+    : source.amountCents;
+  if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
+    errors.amountCents = 'Amount must be a whole number of cents greater than 0.';
+  }
+
+  const date = normalizeDate(source.date, errors, 'date', 'Date');
+  if (!date) errors.date = 'Date is required (YYYY-MM-DD).';
+
+  const direction = source.direction === 'from_goal' ? 'from_goal' : 'to_goal';
+  throwIfErrors(errors);
+
+  const goal = await db.get('goals', goalId);
+  if (!goal) throw new Error('Goal not found.');
+  const method = await db.get('paymentMethods', paymentMethodId);
+  if (!method) throw new Error('Payment method not found.');
+
+  const transactions = await db.getAll('transactions');
+  if (direction === 'to_goal') {
+    const snapshot = methodSnapshot(method, transactions, date);
+    if (rawAmount > snapshot.totalCents) {
+      throw new Error('That is more than the available balance on this payment method.');
+    }
+  } else {
+    const saved = goalSavedCents(goalId, transactions);
+    if (rawAmount > saved) {
+      throw new Error('That is more than this goal has saved.');
+    }
+  }
+
+  const now = new Date().toISOString();
+  const record = {
+    type: direction === 'to_goal' ? 'goal_deposit' : 'goal_withdrawal',
+    date,
+    amountCents: rawAmount,
+    paymentMethodId,
+    goalId,
+    category: 'other',
+    merchant: direction === 'to_goal' ? `To ${goal.name}` : `From ${goal.name}`,
+    notes: '',
+    auto: false,
+    autoKey: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const key = await db.put('transactions', record);
+  record.id = key;
+  return record;
 }

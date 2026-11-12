@@ -1,11 +1,14 @@
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
-// Version 2 adds `groups`. upgradeDatabase only creates missing stores, so
-// existing subscriptions, payment methods, and settings survive the update.
+// Version 3 adds the money ledger (`transactions`) and `goals` for the expense
+// tracker. upgradeDatabase only creates missing stores, so existing
+// subscriptions, payment methods, groups, and settings survive the update.
 const STORE_CONFIG = {
   subscriptions: { keyPath: 'id', autoIncrement: true },
   groups: { keyPath: 'id', autoIncrement: true },
   paymentMethods: { keyPath: 'id', autoIncrement: true },
+  transactions: { keyPath: 'id', autoIncrement: true },
+  goals: { keyPath: 'id', autoIncrement: true },
   settings: { keyPath: 'key', autoIncrement: false },
 };
 

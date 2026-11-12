@@ -12,9 +12,14 @@ import {
 import { createMemoryBackend } from '../public/js/db.js';
 import {
 	getSettings,
+	listGoals,
 	listGroups,
 	listPaymentMethods,
 	listSubscriptions,
+	listTransactions,
+	saveExpense,
+	saveGoal,
+	saveGoalTransfer,
 	saveGroup,
 	savePaymentMethod,
 	saveSettings,
@@ -60,7 +65,13 @@ test('export/import round-trips groups, methods, owners, and settings', async ()
 
 	const target = createMemoryBackend();
 	const result = await applyBackup(target, normalizeBackup(parseBackup(text)));
-	assert.deepEqual(result, { imported: 2, groups: 1, paymentMethods: 1 });
+	assert.deepEqual(result, {
+		imported: 2,
+		groups: 1,
+		paymentMethods: 1,
+		goals: 0,
+		transactions: 0,
+	});
 
 	const [importedGroup] = await listGroups(target);
 	assert.equal(importedGroup.name, 'Family');
@@ -163,4 +174,71 @@ test('export omits runtime-only fields and keeps the stored shape', async () => 
 	assert.equal(row.merchantName, 'Netflix');
 	assert.equal(row.trackedFor, null);
 	assert.ok(!('updatedAt' in row));
+});
+
+test('version 4 backups round-trip ledger entries, goals, and card interest settings', async () => {
+	const source = createMemoryBackend();
+	const method = await savePaymentMethod(source, {
+		label: 'MariBank',
+		kind: 'card',
+		last4: '4821',
+		openingBalanceCents: 5_000_000,
+		openingDate: '2026-11-01',
+		interestRateBps: 325,
+		interestFrequency: 'daily',
+		network: 'mastercard',
+	});
+	const goal = await saveGoal(source, {
+		name: 'Japan trip',
+		targetCents: 5_000_000,
+		deadline: '2027-06-30',
+		color: 'teal',
+	});
+	await saveExpense(source, {
+		date: '2026-11-12',
+		merchant: 'Jollibee',
+		category: 'food',
+		amountCents: 48_550,
+		paymentMethodId: method.id,
+	});
+	await saveGoalTransfer(source, {
+		goalId: goal.id,
+		paymentMethodId: method.id,
+		amountCents: 1_000_000,
+		date: '2026-11-12',
+		direction: 'to_goal',
+	});
+
+	const text = serializeExport(
+		buildExport({
+			settings: await getSettings(source),
+			groups: [],
+			paymentMethods: await listPaymentMethods(source),
+			subscriptions: [],
+			goals: await listGoals(source),
+			transactions: await listTransactions(source),
+		})
+	);
+	const parsed = JSON.parse(text);
+	assert.equal(parsed.version, 4);
+	assert.equal(parsed.paymentMethods[0].interestRateBps, 325);
+	assert.equal(parsed.goals[0].name, 'Japan trip');
+	assert.equal(parsed.transactions.length, 2);
+
+	const target = createMemoryBackend();
+	const result = await applyBackup(target, normalizeBackup(parseBackup(text)));
+	assert.equal(result.transactions, 2);
+	assert.equal(result.goals, 1);
+
+	const [importedMethod] = await listPaymentMethods(target);
+	assert.equal(importedMethod.interestRateBps, 325);
+	assert.equal(importedMethod.interestFrequency, 'daily');
+	assert.equal(importedMethod.openingBalanceCents, 5_000_000);
+
+	const [importedGoal] = await listGoals(target);
+	assert.equal(importedGoal.color, 'teal');
+	const transactions = await listTransactions(target);
+	assert.equal(transactions.length, 2);
+	assert.ok(transactions.every((row) => row.paymentMethodId === importedMethod.id));
+	assert.equal(transactions.find((row) => row.type === 'goal_deposit').goalId, importedGoal.id);
 });

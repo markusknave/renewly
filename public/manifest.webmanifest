@@ -1,13 +1,13 @@
 {
   "id": "/",
-  "name": "Renewly - Subscription Tracker",
+  "name": "Renewly — Expenses & Subscriptions",
   "short_name": "Renewly",
-  "description": "Track every subscription, renewal, and real monthly cost in one place.",
+  "description": "Track daily expenses, card balances, interest, goals, and subscriptions. Everything stays on this device.",
   "start_url": "./",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f4f5fa",
+  "background_color": "#f5f6fb",
   "theme_color": "#4f46e5",
   "lang": "en",
   "dir": "ltr",
@@ -34,15 +34,21 @@
   ],
   "shortcuts": [
     {
-      "name": "Subscriptions",
-      "short_name": "Subscriptions",
-      "url": "./#/",
+      "name": "Add expense",
+      "short_name": "Expense",
+      "url": "./#/expenses",
       "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Settings",
-      "short_name": "Settings",
-      "url": "./#/settings",
+      "name": "Goals",
+      "short_name": "Goals",
+      "url": "./#/goals",
+      "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Subscriptions",
+      "short_name": "Subscriptions",
+      "url": "./#/subscriptions",
       "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
     }
   ]

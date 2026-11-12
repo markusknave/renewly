@@ -86,10 +86,11 @@ for a Play Store release.
 
 ### App updates and data
 
-- `public/js/db.js` opens IndexedDB version 2. The upgrade creates the `groups`
-  store and leaves existing subscriptions, payment methods, and settings alone.
+- `public/js/db.js` opens IndexedDB version 3. The upgrade creates the
+  `transactions` and `goals` stores and leaves existing subscriptions, payment
+  methods, groups, and settings alone.
 - Android updates an app in place when the package name, version code, and
-  signing key match. Version code 3 and the stable beta key guarantee that for
+  signing key match. Version code 4 and the stable beta key guarantee that for
   beta-0.3 and newer builds.
 - Sideloading a package signed by a different key fails with
   `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the only workaround is a one-time
@@ -104,6 +105,10 @@ on it. **Settings → Your data → Export JSON** writes
 the system share sheet through `@capacitor/share`, so the file can be saved to
 Files, Drive, or another app. **Import JSON** opens an in-app dialog with a file
 field and a paste box, and validates the backup before replacing local data.
+
+CSV, Excel, and PDF reports use the same Filesystem + Share path. On Android the
+report is written to the cache as UTF-8 (CSV) or base64 (XLSX/PDF) and handed to
+the share sheet. In a browser the app uses the save picker or a normal download.
 
 ### Notifications
 
@@ -156,7 +161,7 @@ npm run icons
 | Old UI after an update | Fully close the app; bump `CACHE_NAME` in `public/sw.js`; rebuild the APK. |
 | Catalog is empty | Confirm `public/data/plans.json` exists and was copied by `android:sync`. |
 | Data disappeared | App storage was cleared or the APK was uninstalled. Restore from an exported JSON file. |
-| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-0.3, then import the JSON file. |
+| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-1.1, then import the JSON file. |
 | No notification when closed | Grant notification/alarm permission in Android settings and allow Renewly to run without battery restrictions. |
 | Build fails with missing SDK | Install Android SDK Platform 36 and Build-Tools in Android Studio. |
 | PWA install option missing | The page is not HTTPS or `localhost`. Use the APK or an HTTPS host. |

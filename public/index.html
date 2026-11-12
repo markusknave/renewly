@@ -6,9 +6,9 @@
 		<meta name="theme-color" content="#4f46e5" />
 		<meta
 			name="description"
-			content="Renewly tracks subscriptions, renewals, and one-time deals that expire soon. Everything stays on this device."
+			content="Renewly tracks subscriptions and daily expenses, simulates Philippine card balances and interest, funds goals, and exports CSV, Excel, or PDF. Everything stays on this device."
 		/>
-		<title>Renewly</title>
+		<title>Renewly — expenses, cards, and subscriptions</title>
 		<link rel="manifest" href="./manifest.webmanifest" />
 		<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
 		<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
@@ -20,17 +20,61 @@
 				<span class="brand-mark" aria-hidden="true">R</span>
 				Renewly
 			</a>
-			<nav class="nav" id="nav" aria-label="Main">
-				<a href="#/" data-nav="dashboard">Subscriptions</a>
-				<a href="#/groups" data-nav="groups">Groups</a>
-				<a href="#/catalog" data-nav="catalog">Catalog</a>
+			<nav class="nav desktop-nav" id="nav" aria-label="Main">
+				<a href="#/" data-nav="home">Home</a>
+				<a href="#/expenses" data-nav="expenses">Expenses</a>
+				<a href="#/goals" data-nav="goals">Goals</a>
+				<a href="#/insights" data-nav="insights">Insights</a>
+				<a href="#/subscriptions" data-nav="subscriptions">Subscriptions</a>
 				<a href="#/cards" data-nav="cards">Cards</a>
 				<a href="#/settings" data-nav="settings">Settings</a>
 			</nav>
+			<span class="version-pill">beta-1.1</span>
 		</header>
 		<main class="container wide" id="app" aria-live="polite">
 			<p class="muted">Loading…</p>
 		</main>
+
+		<button class="fab" type="button" data-action="new-expense" aria-label="Add expense">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+				<path d="M12 5v14M5 12h14" />
+			</svg>
+		</button>
+
+		<nav class="bottom-nav" aria-label="Primary">
+			<a href="#/" data-nav="home">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M3 10.4 12 3l9 7.4" /><path d="M5.5 9.5V20h13V9.5" /><path d="M9.5 20v-6h5v6" />
+				</svg>
+				<span>Home</span>
+			</a>
+			<a href="#/expenses" data-nav="expenses">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6M9 16h4" />
+				</svg>
+				<span>Expenses</span>
+			</a>
+			<a href="#/goals" data-nav="goals">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" />
+				</svg>
+				<span>Goals</span>
+			</a>
+			<a href="#/insights" data-nav="insights">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z" />
+					<path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+				</svg>
+				<span>Insights</span>
+			</a>
+			<a href="#/more" data-nav="more">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" />
+				</svg>
+				<span>More</span>
+			</a>
+		</nav>
+
 		<noscript><p class="container">Renewly needs JavaScript enabled.</p></noscript>
 		<script type="module" src="./js/app.js"></script>
 	</body>
