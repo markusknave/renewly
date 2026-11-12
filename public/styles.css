@@ -639,7 +639,8 @@ hr {
   position: relative;
   overflow: hidden;
   aspect-ratio: 1.58 / 1;
-  min-height: 190px;
+  width: 100%;
+  max-width: 100%;
   border-radius: 20px;
   padding: 1rem 1.1rem;
   color: var(--card-ink, #fff);
@@ -805,7 +806,7 @@ hr {
 }
 
 .bank-card-compact {
-  min-height: 180px;
+  min-height: 0;
 }
 
 /* ------------------------------------------------------------- mini stats */
