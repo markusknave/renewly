@@ -158,6 +158,7 @@ export function expensesView({
 			<p class="muted">Every purchase, bill, and fee, with exports for the range you choose.</p>
 		</div>
 		<div class="page-head-actions">
+			<a class="btn" href="#/import">${icon('download')} Import</a>
 			<button class="btn btn-primary" type="button" data-action="new-expense">${icon('plus')} Add expense</button>
 		</div>
 	</div>

@@ -84,13 +84,21 @@ file manager.
 place and keeps the WebView IndexedDB data. It is a beta-only key: do not use it
 for a Play Store release.
 
+### Home-screen widget
+
+The native `QuickAddWidget` provider adds a 2×1 widget. Long-press the home
+screen, choose **Widgets → Renewly**, and place it. Tapping it starts
+`MainActivity` with a quick-add extra; the activity loads the app at
+`#/expenses?new=1`, so the expense tracker opens with the add-expense dialog.
+The widget has no background service and stores no data.
+
 ### App updates and data
 
 - `public/js/db.js` opens IndexedDB version 3. The upgrade creates the
   `transactions` and `goals` stores and leaves existing subscriptions, payment
   methods, groups, and settings alone.
 - Android updates an app in place when the package name, version code, and
-  signing key match. Version code 4 and the stable beta key guarantee that for
+  signing key match. Version code 5 and the stable beta key guarantee that for
   beta-0.3 and newer builds.
 - Sideloading a package signed by a different key fails with
   `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the only workaround is a one-time
@@ -161,7 +169,7 @@ npm run icons
 | Old UI after an update | Fully close the app; bump `CACHE_NAME` in `public/sw.js`; rebuild the APK. |
 | Catalog is empty | Confirm `public/data/plans.json` exists and was copied by `android:sync`. |
 | Data disappeared | App storage was cleared or the APK was uninstalled. Restore from an exported JSON file. |
-| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-1.1, then import the JSON file. |
+| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-1.2, then import the JSON file. |
 | No notification when closed | Grant notification/alarm permission in Android settings and allow Renewly to run without battery restrictions. |
 | Build fails with missing SDK | Install Android SDK Platform 36 and Build-Tools in Android Studio. |
 | PWA install option missing | The page is not HTTPS or `localhost`. Use the APK or an HTTPS host. |

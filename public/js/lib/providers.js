@@ -49,7 +49,6 @@ const PROVIDERS = [
 	{ name: 'Philippine Savings Bank (PSBank)', kinds: BANK_KINDS },
 	{ name: 'RCBC', kinds: BANK_KINDS },
 	{ name: 'Robinsons Bank', kinds: BANK_KINDS },
-	{ name: 'SeaBank', kinds: BANK_KINDS },
 	{ name: 'Security Bank', kinds: BANK_KINDS },
 	{ name: 'ShopeePay', kinds: EWALLET_KINDS },
 	{ name: 'Standard Chartered', kinds: BANK_KINDS },

@@ -169,17 +169,6 @@ const THEMES = [
 		network: 'mastercard',
 	},
 	{
-		key: 'seabank',
-		match: ['seabank', 'sea bank'],
-		issuer: 'SeaBank',
-		c1: '#c2410c',
-		c2: '#f97316',
-		ink: '#fff7ed',
-		accent: '#fed7aa',
-		pattern: 'diagonal',
-		network: 'visa',
-	},
-	{
 		key: 'gotyme',
 		match: ['gotyme', 'go tyme'],
 		issuer: 'GoTyme',

@@ -6,12 +6,14 @@ import {
 	expensesView,
 	goalsView,
 	homeView,
+	importView,
 	insightsView,
 	moreView,
 } from '../public/js/views.js';
 import { buildInsights } from '../public/js/insights.js';
 import { goalSnapshots, monthRange, summarizePeriod } from '../public/js/finance.js';
 import { cardThemeFor, instrumentFor } from '../public/js/lib/cardThemes.js';
+import { providersFor } from '../public/js/lib/providers.js';
 import { detectCategory } from '../public/js/lib/categories.js';
 
 const today = '2026-11-12';
@@ -159,11 +161,84 @@ test('insights screen shows the privacy banner, forecast, tips, and chat', () =>
 
 test('more hub links every secondary screen', () => {
 	const html = moreView({ methods, goals, subscriptions, transactions, settings });
-	for (const href of ['#/subscriptions', '#/cards', '#/goals', '#/expenses', '#/catalog', '#/groups', '#/settings']) {
+	for (const href of ['#/subscriptions', '#/cards', '#/goals', '#/expenses', '#/import', '#/catalog', '#/groups', '#/settings']) {
 		assert.ok(html.includes(`href="${href}"`), `missing ${href}`);
 	}
 });
 
+test('More modules expose a breadcrumb back to the hub', () => {
+	const pages = [
+		cardsView({ methods, snapshots, today }),
+		moreView({ methods, goals, subscriptions, transactions, settings }),
+	];
+	const html = pages.join('');
+	assert.ok(html.includes('aria-label="Breadcrumb"'));
+	assert.ok(html.includes('href="#/more"'));
+	assert.ok(html.includes('Cards &amp; wallets'));
+});
+
+test('SeaBank uses its current MariBank name', () => {
+	const banks = providersFor('bank');
+	assert.ok(banks.includes('MariBank'));
+	assert.ok(!banks.includes('SeaBank'));
+	assert.equal(cardThemeFor('MariBank', 'bank').key, 'maribank');
+});
+
+test('import review renders the drop zone, analyst summary, and commit form', () => {
+	const html = importView({
+		methods,
+		defaultMethodId: 1,
+		preview: {
+			fileName: 'statement.csv',
+			format: 'CSV',
+			rows: [
+				{
+					date: '2026-11-01',
+					merchant: 'Jollibee',
+					amountCents: 12_550,
+					category: 'food',
+					notes: '',
+					paymentMethodId: 1,
+					methodLabel: 'MariBank',
+					duplicate: false,
+				},
+				{
+					date: '2026-11-02',
+					merchant: 'Uniqlo',
+					amountCents: 89_900,
+					category: 'shopping',
+					notes: '',
+					paymentMethodId: 1,
+					methodLabel: 'MariBank',
+					duplicate: true,
+				},
+			],
+			stats: { total: 2, valid: 1, invalid: 0, duplicates: 1, creditsSkipped: 0 },
+			warnings: ['1 row already exists and is excluded by default.'],
+			analysis: {
+				count: 1,
+				totalCents: 12_550,
+				categories: [{ key: 'food', label: 'Food & drinks', amountCents: 12_550, share: 100 }],
+				from: '2026-11-01',
+				to: '2026-11-01',
+			},
+		},
+	});
+	assert.match(html, /id="expense-import-file"/);
+	assert.match(html, /data-form="import-expenses"/);
+	assert.match(html, /Re-run analyst/);
+	assert.match(html, /Jollibee/);
+	assert.match(html, /Duplicate/);
+	assert.match(html, /Import 1 expense/);
+	assert.match(html, /Analyst top category/);
+});
+
+test('import screen explains supported formats before a file is chosen', () => {
+	const html = importView({ methods, preview: null });
+	assert.match(html, /CSV, PDF, Excel/);
+	assert.match(html, /Money Manager/);
+	assert.match(html, /How matching works/);
+});
 test('payment method screen exposes balances, rates, compounding, and network', () => {
 	const html = cardsView({ methods, snapshots, today });
 	assert.match(html, /name="openingBalance"/);

@@ -2,6 +2,7 @@ import { openDb } from './db.js';
 import * as store from './store.js';
 import * as finance from './finance.js';
 import { answerQuestion, buildInsights } from './insights.js';
+import { analyzeRows, importRows, parseImportFile, recategorizeRows } from './import.js';
 import * as report from './export.js';
 import * as notifications from './notifications.js';
 import * as backup from './backup.js';
@@ -30,6 +31,9 @@ const state = {
 	chat: [],
 	pendingExpenseOpen: false,
 	pendingGoalOpen: false,
+	importPreview: null,
+	importBusy: false,
+	importDefaultMethodId: null,
 };
 
 let renderToken = 0;
@@ -40,13 +44,16 @@ function todayIso() {
 
 function parseRoute() {
 	const raw = (location.hash || '#/').replace(/^#/, '');
-	const [pathPart] = raw.split('?');
+	const [pathPart, queryPart] = raw.split('?');
+	const query = new URLSearchParams(queryPart || '');
 	const parts = pathPart.split('/').filter(Boolean);
 	if (!parts.length) return { name: 'home' };
 	if (parts[0] === 'add') return { name: 'add', platformKey: parts[1] || '', planId: parts[2] || '' };
 	if (parts[0] === 'edit') return { name: 'edit', id: Number(parts[1]) };
-	const known = ['expenses', 'goals', 'insights', 'more', 'subscriptions', 'catalog', 'cards', 'groups', 'settings'];
-	if (known.includes(parts[0])) return { name: parts[0] };
+	const known = ['expenses', 'goals', 'insights', 'more', 'subscriptions', 'catalog', 'cards', 'groups', 'settings', 'import'];
+	if (known.includes(parts[0])) {
+		return { name: parts[0], newExpense: query.get('new') === '1' };
+	}
 	return { name: 'home' };
 }
 
@@ -68,6 +75,7 @@ function setNav(routeName) {
 		catalog: 'more',
 		groups: 'more',
 		settings: 'more',
+		import: 'more',
 		add: 'more',
 		edit: 'more',
 	};
@@ -106,6 +114,16 @@ async function reload() {
 		&& !state.groups.some((group) => String(group.id) === String(state.groupFilter))
 	) {
 		state.groupFilter = '';
+	}
+	if (!state.importDefaultMethodId && state.methods.length) {
+		state.importDefaultMethodId = state.methods[0].id;
+	}
+	const renamed = state.methods.filter((method) => /^seabank\b/i.test(String(method.label || '').trim()));
+	for (const method of renamed) {
+		await store.savePaymentMethod(state.db, { ...method, label: 'MariBank' });
+	}
+	if (renamed.length) {
+		state.methods = await store.listPaymentMethods(state.db);
 	}
 	try {
 		await finance.accrueInterest(state.db, state.methods, state.transactions, todayIso());
@@ -255,6 +273,13 @@ async function render() {
 			chat: state.chat,
 			methods: state.methods,
 		});
+	} else if (route.name === 'import') {
+		body = views.importView({
+			methods: state.methods,
+			preview: state.importPreview,
+			busy: state.importBusy,
+			defaultMethodId: state.importDefaultMethodId ?? state.methods[0]?.id ?? null,
+		});
 	} else if (route.name === 'more') {
 		body = views.moreView({
 			methods: state.methods,
@@ -346,6 +371,10 @@ async function render() {
 	if (route.name === 'expenses' && state.pendingExpenseOpen) {
 		state.pendingExpenseOpen = false;
 		openExpenseDialog();
+	}
+	if (route.name === 'expenses' && route.newExpense) {
+		openExpenseDialog();
+		history.replaceState(null, '', '#/expenses');
 	}
 	if (route.name === 'goals' && state.pendingGoalOpen) {
 		state.pendingGoalOpen = false;
@@ -598,6 +627,32 @@ async function newGoal() {
 		return;
 	}
 	openGoalDialog();
+}
+
+async function handleImportFile(file) {
+	if (!file || state.importBusy) return;
+	state.importBusy = true;
+	state.flash = null;
+	await render();
+	try {
+		const preview = await parseImportFile(file, {
+			methods: state.methods,
+			defaultMethodId: state.importDefaultMethodId ?? state.methods[0]?.id ?? null,
+			existing: state.transactions,
+			today: todayIso(),
+		});
+		state.importPreview = preview;
+		state.flash = {
+			type: 'ok',
+			message: `Read ${preview.rows.length} expense row${preview.rows.length === 1 ? '' : 's'} from ${file.name}`,
+		};
+	} catch (err) {
+		state.importPreview = null;
+		state.flash = { type: 'error', message: err?.message || 'Could not read that file.' };
+	} finally {
+		state.importBusy = false;
+		await render();
+	}
 }
 
 function base64FromBytes(bytes) {
@@ -895,6 +950,28 @@ async function onSubmit(event) {
 			await render();
 			return;
 		}
+		if (type === 'import-expenses') {
+			const fd = new FormData(form);
+			const defaultMethodId = readNumber(fd.get('defaultMethodId'));
+			const result = await importRows(state.db, state.importPreview?.rows || [], {
+				defaultMethodId,
+				existing: state.transactions,
+			});
+			state.importPreview = null;
+			state.flash = {
+				type: result.imported ? 'ok' : 'error',
+				message: result.imported
+					? `Imported ${result.imported} expense${result.imported === 1 ? '' : 's'}${
+							result.skipped ? `; ${result.skipped} duplicate${result.skipped === 1 ? '' : 's'} skipped` : ''
+						}${result.failed ? `; ${result.failed} failed` : ''}`
+					: `No expenses imported${result.skipped ? `; ${result.skipped} duplicates skipped` : ''}${
+							result.failed ? `; ${result.failed} failed` : ''
+						}`,
+			};
+			await reload();
+			await render();
+			return;
+		}
 		if (type === 'import') {
 			const fd = new FormData(form);
 			const text = String(fd.get('backupText') || '').trim();
@@ -989,7 +1066,22 @@ async function onClick(event) {
 			else if (action === 'transfer-goal') openTransferDialog(Number(trigger.dataset.id), 'to_goal');
 			else if (action === 'withdraw-goal') openTransferDialog(Number(trigger.dataset.id), 'from_goal');
 			else if (action === 'close-transfer') closeDialog('transfer-dialog');
-			else if (action === 'export-report') await exportReport(trigger.dataset.format || 'csv');
+			else if (action === 'clear-import') {
+				state.importPreview = null;
+				state.flash = null;
+				await render();
+			} else if (action === 'recategorize-import') {
+				if (state.importPreview) {
+					const rows = recategorizeRows(state.importPreview.rows);
+					state.importPreview = {
+						...state.importPreview,
+						rows,
+						analysis: analyzeRows(rows),
+					};
+					state.flash = { type: 'ok', message: 'Categories re-run through the local analyst' };
+					await render();
+				}
+			} else if (action === 'export-report') await exportReport(trigger.dataset.format || 'csv');
 			else if (action === 'enable-notifications') {
 				state.notifyPermission = await notifications.requestPermission();
 				if (state.notifyPermission === 'granted') await syncReminders({ request: true });
@@ -1073,6 +1165,12 @@ async function onChange(event) {
 		} finally {
 			target.value = '';
 		}
+		return;
+	}
+	if (target.id === 'expense-import-file' && target.files?.[0]) {
+		const file = target.files[0];
+		target.value = '';
+		await handleImportFile(file);
 		return;
 	}
 
@@ -1258,6 +1356,16 @@ async function boot() {
 	document.addEventListener('submit', onSubmit);
 	document.addEventListener('change', onChange);
 	document.addEventListener('input', onInput);
+	document.addEventListener('dragover', (event) => {
+		if (event.target.closest('.dropzone')) event.preventDefault();
+	});
+	document.addEventListener('drop', (event) => {
+		const zone = event.target.closest('.dropzone');
+		if (!zone) return;
+		event.preventDefault();
+		const file = event.dataTransfer?.files?.[0];
+		if (file) handleImportFile(file);
+	});
 	if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 		navigator.serviceWorker.register(new URL('../sw.js', import.meta.url)).catch(() => {});
 	}

@@ -40,6 +40,12 @@
       "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
     },
     {
+      "name": "Import expenses",
+      "short_name": "Import",
+      "url": "./#/import",
+      "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
+    },
+    {
       "name": "Goals",
       "short_name": "Goals",
       "url": "./#/goals",

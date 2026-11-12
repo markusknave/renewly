@@ -245,6 +245,35 @@ hr {
   max-width: 1200px;
 }
 
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.breadcrumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.breadcrumb [aria-current="page"] {
+  color: var(--text);
+}
+
+.breadcrumb-sep {
+  color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
 .page-head {
   display: flex;
   align-items: flex-end;
@@ -2201,6 +2230,157 @@ textarea {
   background: var(--brand-soft);
   border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
   color: var(--brand-text);
+}
+
+/* --------------------------------------------------------------- import */
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.2rem;
+  border: 1.5px dashed color-mix(in srgb, var(--brand) 45%, var(--line));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--brand) 5%, var(--panel));
+  cursor: pointer;
+  text-align: left;
+}
+
+.dropzone:hover {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 9%, var(--panel));
+}
+
+.dropzone.is-busy {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.dropzone-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 14px;
+  background: var(--brand-soft);
+  color: var(--brand-text);
+}
+
+.dropzone-icon .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.dropzone-copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.dropzone-copy strong {
+  font-size: 0.95rem;
+}
+
+.import-stats,
+.import-analysis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.8rem;
+}
+
+.import-stats > div,
+.import-analysis > div {
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  background: var(--bg-soft);
+  min-width: 0;
+}
+
+.import-stats strong,
+.import-analysis strong {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.import-analysis {
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+  padding: 0.55rem;
+  border-radius: 14px;
+}
+
+.import-analysis > div {
+  background: transparent;
+}
+
+.import-analysis .small-value {
+  font-size: 0.78rem;
+}
+
+.import-warnings {
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 0.8rem 0.7rem 1.6rem;
+  border-radius: 12px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 0.8rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.import-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.import-actions .btn {
+  min-height: 40px;
+}
+
+.import-table td {
+  vertical-align: top;
+}
+
+@media (max-width: 759px) {
+  .import-stats,
+  .import-analysis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .import-table,
+  .import-table tbody,
+  .import-table tr,
+  .import-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .import-table thead {
+    display: none;
+  }
+
+  .import-table tr {
+    padding: 0.6rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .import-table td {
+    padding: 0.15rem 0;
+    border: 0;
+  }
+
+  .import-table td:last-child {
+    padding-top: 0.35rem;
+  }
 }
 
 /* --------------------------------------------------------------- groups */
