@@ -54,8 +54,8 @@ sha256sum -c renewly-beta-1.2-hotfix.apk.sha256
 - A Husky `pre-commit` hook runs `npm run verify` (Vitest plus the local
   security check) before a commit is created.
 - GitHub Actions on every pull request runs tests, coverage, npm audit,
-  gitleaks, actionlint, Trivy, CodeQL, and dependency review. The Android job
-  builds an unsigned debug APK without release secrets.
+  gitleaks, actionlint, Trivy, and CodeQL. The Android job builds an unsigned
+  debug APK without release secrets.
 - Main-branch protection requires the `test`, `security`, and `android` checks
   and a pull request before merge.
 - A release tag runs the same gates, decodes the signing key from secrets,

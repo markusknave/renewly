@@ -30,8 +30,7 @@ renewly-beta-1.2-hotfix.apk
   limits. A crafted statement can no longer wedge the app.
 - **Automation and security gates.** Vitest with coverage thresholds, a local
   pre-commit check, GitHub CI for tests, npm audit, gitleaks, actionlint, Trivy,
-  CodeQL, and dependency review. Release tags build a signed APK only after the
-  gates pass.
+  and CodeQL. Release tags build a signed APK only after the gates pass.
 
 ## What is new in beta-1.2
 
@@ -418,5 +417,5 @@ android/                 Capacitor Android project (includes QuickAddWidget)
 test/                    Vitest suites
 vitest.config.js         Vitest and coverage thresholds
 .husky/pre-commit        runs npm run verify before each commit
-.github/workflows/       CI, CodeQL, dependency review, and signed release
+.github/workflows/       CI, CodeQL, and signed release
 ```

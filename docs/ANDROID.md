@@ -154,10 +154,10 @@ notification while it is open.
 ### Option C - Build in the cloud
 
 `.github/workflows/ci.yml` runs on every pull request and on `main`. It runs
-Vitest with coverage, npm audit, gitleaks, actionlint, Trivy, CodeQL, and
-dependency review. The Android job installs Node, Java, and the Android SDK,
-syncs Capacitor, and builds an unsigned debug APK. It does not receive release
-signing secrets and uploads no APK.
+Vitest with coverage, npm audit, gitleaks, actionlint, Trivy, and CodeQL. The
+Android job installs Node, Java, and the Android SDK, syncs Capacitor, and
+builds an unsigned debug APK. It does not receive release signing secrets and
+uploads no APK.
 
 `.github/workflows/release.yml` runs only when a `beta-*` tag is pushed. It
 repeats the tests and security gates, decodes `RENEWLY_KEYSTORE_BASE64` into

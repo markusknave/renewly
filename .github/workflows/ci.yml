@@ -43,23 +43,20 @@ jobs:
       - run: npm ci
       - run: npm run security:check
       - run: npm run security:audit
-      - name: Install gitleaks and actionlint
+      - name: Install gitleaks, actionlint, and Trivy
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.29.1/gitleaks_8.29.1_linux_x64.tar.gz | tar -xz -C /usr/local/bin gitleaks
           curl -sSfL https://github.com/rhysd/actionlint/releases/download/v1.7.9/actionlint_1.7.9_linux_amd64.tar.gz | tar -xz -C /usr/local/bin actionlint
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.69.3/contrib/install.sh | sh -s -- -b /usr/local/bin v0.69.3
       - name: Secret scan
         run: gitleaks detect --no-git --source . --redact --config .gitleaks.toml
       - name: Workflow lint
         run: actionlint
       - name: Filesystem and dependency scan
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln,secret,misconfig
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-          skip-dirs: .git,node_modules,coverage,android/.gradle,android/app/build,android/build
+        run: |
+          trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 1 \
+            --skip-dirs .git --skip-dirs node_modules --skip-dirs coverage \
+            --skip-dirs android/.gradle --skip-dirs android/app/build --skip-dirs android/build .
 
   android:
     name: android
