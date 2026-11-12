@@ -28,6 +28,13 @@ being skipped or counted as negative expenses.
 - **Backups and Money Manager.** Renewly JSON backups and MMBAK/MMBAK SQLite
   rows preserve income instead of dropping it.
 
+## Existing imports
+
+Rows imported before beta-1.3 keep their old type. Open an affected entry and
+switch it to **Income**, or delete the old rows and re-import the statement with
+the corrected Type column. Type is part of duplicate matching, so re-importing
+without removing an old expense creates a separate income row.
+
 ## Upgrading
 
 Install beta-1.3 over beta-1.2-hotfix. It uses the same rotated signing key and
