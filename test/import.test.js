@@ -13,6 +13,7 @@ import { readMmbak, readSqliteTables } from '../public/js/importers/sqlite.js';
 import { MAX_IMPORT_BYTES } from '../public/js/importers/limits.js';
 import { rowsToTransactions, linesToTransactions, parseAnyDate, parseMoney } from '../public/js/importers/table.js';
 import { buildReport, toPdf, toXlsx } from '../public/js/export.js';
+import { methodBalance } from '../public/js/finance.js';
 import { createMemoryBackend } from '../public/js/db.js';
 import { listTransactions, savePaymentMethod } from '../public/js/store.js';
 
@@ -54,7 +55,7 @@ test('CSV parser handles quotes, delimiters, and CRLF', () => {
 	assert.equal(semicolon[1][1], 'Lunch');
 });
 
-test('table mapping infers categories, methods, and skips credits', () => {
+test('table mapping infers categories, methods, expenses, and income', () => {
 	const rows = [
 		['Date', 'Description', 'Amount', 'Category', 'Account'],
 		['2026-11-01', 'Jollibee, SM', '-125.50', 'Food', 'BPI Debit'],
@@ -62,24 +63,62 @@ test('table mapping infers categories, methods, and skips credits', () => {
 		['2026-11-03', 'Salary', '50000.00', 'Income', 'Maya'],
 	];
 	const result = rowsToTransactions(rows, { methods, defaultMethodId: 1 });
-	assert.equal(result.stats.valid, 2);
-	assert.equal(result.stats.creditsSkipped, 1);
+	assert.equal(result.stats.valid, 3);
+	assert.equal(result.stats.expenseCount, 2);
+	assert.equal(result.stats.incomeCount, 1);
+	assert.equal(result.stats.expenseCents, 102_450);
+	assert.equal(result.stats.incomeCents, 5_000_000);
 	assert.equal(result.rows[0].category, 'food');
 	assert.equal(result.rows[0].paymentMethodId, 1);
+	assert.equal(result.rows[0].type, 'expense');
 	assert.equal(result.rows[1].category, 'shopping');
 	assert.equal(result.rows[1].paymentMethodId, 2);
+	assert.equal(result.rows[2].type, 'income');
+	assert.equal(result.rows[2].category, 'income');
+	assert.equal(result.rows[2].amountCents, 5_000_000);
 });
 
-test('debit/credit columns are handled separately', () => {
+test('debit/credit columns become expenses and income', () => {
 	const rows = [
 		['Date', 'Description', 'Debit', 'Credit', 'Account'],
 		['2026-11-01', 'Lunch', '125.00', '', 'BPI Debit'],
 		['2026-11-02', 'Refund', '', '50.00', 'BPI Debit'],
+		['2026-11-03', 'Salary', '0.00', '50000.00', 'BPI Debit'],
 	];
 	const result = rowsToTransactions(rows, { methods });
-	assert.equal(result.rows.length, 1);
+	assert.equal(result.rows.length, 3);
+	assert.equal(result.rows[0].type, 'expense');
 	assert.equal(result.rows[0].amountCents, 12_500);
-	assert.equal(result.stats.creditsSkipped, 1);
+	assert.equal(result.rows[1].type, 'income');
+	assert.equal(result.rows[1].amountCents, 5_000);
+	assert.equal(result.rows[2].type, 'income');
+	assert.equal(result.rows[2].amountCents, 5_000_000);
+	assert.equal(result.stats.expenseCount, 1);
+	assert.equal(result.stats.incomeCount, 2);
+});
+
+test('explicit type columns map income and expenses', () => {
+	const rows = [
+		['Date', 'Description', 'Amount', 'Type'],
+		['2026-11-01', 'Lunch', '125.00', 'Expense'],
+		['2026-11-02', 'Salary', '50000.00', 'Income'],
+	];
+	const result = rowsToTransactions(rows, { methods, defaultMethodId: 1 });
+	assert.equal(result.rows.length, 2);
+	assert.equal(result.rows[0].type, 'expense');
+	assert.equal(result.rows[0].amountCents, 12_500);
+	assert.equal(result.rows[1].type, 'income');
+	assert.equal(result.rows[1].amountCents, 5_000_000);
+	assert.equal(result.stats.expenseCount, 1);
+	assert.equal(result.stats.incomeCount, 1);
+
+	const signed = rowsToTransactions([
+		['Date', 'Description', 'Amount'],
+		['2026-11-01', 'Lunch', '-125.00'],
+		['2026-11-02', 'Salary', '50000.00'],
+	], { methods });
+	assert.equal(signed.rows[0].type, 'expense');
+	assert.equal(signed.rows[1].type, 'income');
 });
 
 test('date and money parsing cover local, epoch, Excel, and currency formats', () => {
@@ -112,6 +151,12 @@ test('PDF writer output extracts text lines and maps to expenses', async () => {
 	assert.deepEqual(result.rows.map((row) => row.amountCents), [89_900, 12_550]);
 	assert.equal(result.rows[0].merchant, 'Uniqlo');
 	assert.equal(result.rows[1].merchant, 'Jollibee');
+
+	const income = linesToTransactions(['2026-11-03 Salary 50000.00'], { methods, defaultMethodId: 1 });
+	assert.equal(income.rows.length, 1);
+	assert.equal(income.rows[0].type, 'income');
+	assert.equal(income.rows[0].amountCents, 5_000_000);
+	assert.equal(income.rows[0].category, 'income');
 });
 
 test('MMBAK reads ZIP or plain SQLite Money Manager rows', async () => {
@@ -134,12 +179,18 @@ test('MMBAK reads ZIP or plain SQLite Money Manager rows', async () => {
 	try {
 		const bytes = readFileSync(path);
 		const result = await readMmbak(bytes, { methods, defaultMethodId: 1 });
-		assert.equal(result.rows.length, 2);
-		assert.equal(result.stats.creditsSkipped, 1);
+		assert.equal(result.rows.length, 3);
+		assert.equal(result.stats.expenseCount, 2);
+		assert.equal(result.stats.incomeCount, 1);
+		assert.equal(result.stats.incomeCents, 5_000_000);
 		assert.equal(result.rows[0].category, 'food');
 		assert.equal(result.rows[0].paymentMethodId, 1);
+		assert.equal(result.rows[0].type, 'expense');
 		assert.equal(result.rows[1].paymentMethodId, 2);
 		assert.equal(result.rows[1].merchant, 'Uniqlo shirt');
+		assert.equal(result.rows[2].type, 'income');
+		assert.equal(result.rows[2].merchant, 'Salary');
+		assert.equal(result.rows[2].category, 'income');
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -151,14 +202,19 @@ test('JSON import handles Renewly backups and generic arrays', async () => {
 		version: 4,
 		transactions: [
 			{ type: 'expense', date: '2026-11-01', amountCents: 12_550, merchant: 'Jollibee', category: 'food', paymentMethodId: 1, notes: '' },
+			{ type: 'income', date: '2026-11-02', amountCents: 50_000, merchant: 'Salary', paymentMethodId: 1, notes: '' },
 			{ type: 'interest', date: '2026-11-02', amountCents: 100, merchant: 'Interest', paymentMethodId: 1 },
 		],
 		paymentMethods: [{ id: 1, label: 'BPI Debit' }],
 	};
 	const preview = await parseImportFile(fileLike('backup.json', JSON.stringify(backup), 'application/json'), { methods, defaultMethodId: 1 });
 	assert.equal(preview.format, 'JSON');
-	assert.equal(preview.rows.length, 1);
+	assert.equal(preview.rows.length, 2);
 	assert.equal(preview.rows[0].amountCents, 12_550);
+	assert.equal(preview.rows[0].type, 'expense');
+	assert.equal(preview.rows[1].type, 'income');
+	assert.equal(preview.rows[1].category, 'income');
+	assert.equal(preview.stats.incomeCents, 50_000);
 
 	const generic = await parseImportFile(
 		fileLike('expenses.json', JSON.stringify([{ date: '2026-11-03', description: 'Grab ride', amount: 250, account: 'Maya' }]), 'application/json'),
@@ -186,33 +242,37 @@ test('parseImportFile detects CSV, XLSX, and PDF files', async () => {
 	assert.equal(pdf.rows.length, 2);
 });
 
-test('importRows commits expenses and skips duplicates', async () => {
+test('importRows commits expenses and income and skips duplicates', async () => {
 	const db = createMemoryBackend();
-	const account = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card', openingBalanceCents: 100_000 });
+	const account = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card', openingBalanceCents: 100_000, openingDate: '2026-11-01' });
 	const rows = [
-		{ date: '2026-11-01', merchant: 'Jollibee', amountCents: 12_550, category: 'food', notes: '', paymentMethodId: account.id },
-		{ date: '2026-11-01', merchant: 'Jollibee', amountCents: 12_550, category: 'food', notes: '', paymentMethodId: account.id },
+		{ type: 'expense', date: '2026-11-01', merchant: 'Jollibee', amountCents: 12_550, category: 'food', notes: '', paymentMethodId: account.id },
+		{ type: 'expense', date: '2026-11-01', merchant: 'Jollibee', amountCents: 12_550, category: 'food', notes: '', paymentMethodId: account.id },
+		{ type: 'income', date: '2026-11-02', merchant: 'Salary', amountCents: 50_000, category: 'income', notes: '', paymentMethodId: account.id },
 	];
 	const first = await importRows(db, rows, { existing: [] });
-	assert.deepEqual(first, { imported: 1, skipped: 1, failed: 0 });
+	assert.deepEqual(first, { imported: 2, importedExpense: 1, importedIncome: 1, skipped: 1, failed: 0 });
 	const second = await importRows(db, rows, { existing: await listTransactions(db) });
-	assert.deepEqual(second, { imported: 0, skipped: 2, failed: 0 });
+	assert.deepEqual(second, { imported: 0, importedExpense: 0, importedIncome: 0, skipped: 3, failed: 0 });
 	const transactions = await listTransactions(db);
-	assert.equal(transactions.length, 1);
-	assert.equal(transactions[0].type, 'expense');
+	assert.equal(transactions.length, 2);
+	assert.equal(transactions.find((row) => row.type === 'expense').amountCents, 12_550);
+	assert.equal(transactions.find((row) => row.type === 'income').amountCents, 50_000);
+	assert.equal(transactions.find((row) => row.type === 'income').category, 'income');
+	assert.equal(methodBalance(account, transactions, '2026-11-30'), 137_450);
 });
 
 test('analyst helpers recategorize and summarize imported rows', () => {
 	const rows = [
-		{ date: '2026-11-01', merchant: 'Grab ride', amountCents: 25_000, category: 'other', notes: '', paymentMethodId: 1 },
-		{ date: '2026-11-02', merchant: 'Meralco bill', amountCents: 150_000, category: 'other', notes: '', paymentMethodId: 1 },
+		{ type: 'expense', date: '2026-11-01', merchant: 'Grab ride', amountCents: 25_000, category: 'other', notes: '', paymentMethodId: 1 },
+		{ type: 'expense', date: '2026-11-02', merchant: 'Meralco bill', amountCents: 150_000, category: 'other', notes: '', paymentMethodId: 1 },
 	];
 	const recategorized = recategorizeRows(rows);
 	assert.equal(recategorized[0].category, 'transport');
 	assert.equal(recategorized[1].category, 'bills');
 	const analysis = analyzeRows(recategorized);
 	assert.equal(analysis.count, 2);
-	assert.equal(analysis.totalCents, 175_000);
+	assert.equal(analysis.expenseCents, 175_000);
 	assert.equal(analysis.categories[0].key, 'bills');
 });
 

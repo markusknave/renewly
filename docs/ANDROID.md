@@ -118,7 +118,7 @@ The widget has no background service and stores no data.
   `transactions` and `goals` stores and leaves existing subscriptions, payment
   methods, groups, and settings alone.
 - Android updates an app in place when the package name, version code, and
-  signing key match. Version code 6 and the new beta key guarantee that for
+  signing key match. Version code 7 and the rotated beta key guarantee that for
   beta-1.2-hotfix and newer builds.
 - Sideloading a package signed by a different key fails with
   `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the only workaround is a one-time
@@ -205,7 +205,7 @@ npm run icons
 | Old UI after an update | Fully close the app; bump `CACHE_NAME` in `public/sw.js`; rebuild the APK. |
 | Catalog is empty | Confirm `public/data/plans.json` exists and was copied by `android:sync`. |
 | Data disappeared | App storage was cleared or the APK was uninstalled. Restore from an exported JSON file. |
-| Install says signature mismatch | The old APK used the retired key. Export data, uninstall once, install beta-1.2-hotfix, then import the JSON file. |
+| Install says signature mismatch | The old APK used the retired key. Export data, uninstall once, install beta-1.3, then import the JSON file. |
 | No notification when closed | Grant notification/alarm permission in Android settings and allow Renewly to run without battery restrictions. |
 | Build fails with missing SDK | Install Android SDK Platform 36 and Build-Tools in Android Studio. |
 | PWA install option missing | The page is not HTTPS or `localhost`. Use the APK or an HTTPS host. |

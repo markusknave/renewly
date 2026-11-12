@@ -6,12 +6,26 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-1.2-hotfix](https://github.com/markusknave/renewly/releases/tag/beta-1.2-hotfix),
+[beta-1.3](https://github.com/markusknave/renewly/releases/tag/beta-1.3),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-1.2-hotfix.apk
+renewly-beta-1.3.apk
 ```
+
+## What is new in beta-1.3
+
+- **Income is a first-class ledger type.** CSV, Excel, PDF, JSON, and Money
+  Manager imports now store credits, deposits, salary, refunds, and income rows
+  as income instead of skipping them or treating them as negative expenses.
+- **Manual income entry.** The add/edit dialog has an Expense / Income selector.
+  Income increases the selected card or wallet; expenses decrease it.
+- **Type filter and totals.** The Expenses screen filters by All types,
+  Expenses, or Income and shows expense, income, and net totals.
+- **Reports and backups.** CSV, XLSX, PDF, Renewly JSON, and MMBAK paths keep
+  income positive and preserve its type.
+- **Import review.** The preview shows Type, expense/income counts, separate
+  totals, net, and analyst categories before commit.
 
 ## What is new in beta-1.2-hotfix
 
@@ -72,30 +86,34 @@ renewly-beta-1.2-hotfix.apk
 
 ### Expenses and balances
 
-- Add an expense with date, description, amount, category, notes, and payment
-  method.
+- Add an expense or income entry with date, description, amount, category,
+  notes, and payment method.
 - Categories: food and drinks, groceries, transport, bills and utilities,
-  shopping, health, entertainment, education, travel, home, and other.
+  shopping, health, entertainment, education, travel, home, and other. Income
+  uses the dedicated Income category.
 - Every payment method has a starting balance and a balance date. Its current
   balance is the starting balance plus income and interest, minus expenses and
   goal deposits, plus goal withdrawals.
 - Filter by this month, last month, last 7 days, last 30 days, this year, all
-  time, or a custom range. Category, method, and text filters apply on top.
-- Delete an expense to restore the amount to its payment method.
+  time, or a custom range. Type, category, method, and text filters apply on
+  top.
+- Delete an entry to recalculate the payment method balance.
 
 ### Importing statements
 
 - Supported files: CSV/TSV, text-based PDF, Excel `.xlsx`, JSON, and Realbyte
   Money Manager `.mbak`/`.mmbak` (ZIP-wrapped or plain SQLite).
-- Open **Expenses → Import** or **More → Import expenses**. Choose or drop a
+- Open **Expenses → Import** or **More → Import transactions**. Choose or drop a
   file, review the parsed rows, then import.
 - The local analyst infers categories from the description and notes, and
   matches account/card names to your saved payment methods. Rows without a
   match use the default method you choose.
-- Debit and withdrawal rows become expenses. Credit, deposit, and income rows
-  are skipped because this import is expense-focused.
-- Duplicate rows (same date, amount, normalized merchant, and method) are marked
-  and excluded. The commit step rechecks against the current ledger.
+- Debit, withdrawal, and expense rows become expenses. Credit, deposit, salary,
+  refund, and income rows become income. Separate Debit/Credit columns and an
+  explicit Type/Category column are both supported. The preview's Type column
+  lets you correct an individual row before committing.
+- Duplicate rows (same date, type, amount, normalized merchant, and method) are
+  marked and excluded. The commit step rechecks against the current ledger.
 - Legacy `.xls` files are not supported; save them as `.xlsx` or CSV. Scanned
   image PDFs need OCR before import because there is no text layer to read.
 - The import is local: the file is read in the browser/WebView and nothing is
@@ -138,8 +156,9 @@ renewly-beta-1.2-hotfix.apk
   row, auto-filter, and currency formatting.
 - **PDF** with a title, date range, totals, a monospaced table, page numbers,
   and automatic pagination.
-- The export follows the current date range, category, method, and search
-  filters. It includes expenses, interest, and goal transfers in that range.
+- The export follows the current date range, type, category, method, and search
+  filters. It includes expenses, income, interest, and goal transfers in that
+  range; income stays positive and expenses are negative.
 
 ### Subscriptions
 
@@ -173,8 +192,13 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-1.2-hotfix.apk
+adb install -r renewly-beta-1.3.apk
 ```
+
+### Updating from beta-1.2-hotfix
+
+Install beta-1.3 over beta-1.2-hotfix. It uses the same rotated signing key and
+the same IndexedDB schema, so no uninstall or backup restore is required.
 
 ### Updating from beta-1.2 or earlier
 
@@ -184,7 +208,7 @@ different signer, so it will reject an in-place update with
 
 1. Export a JSON backup from **More → Settings**.
 2. Uninstall Renewly once.
-3. Install `renewly-beta-1.2-hotfix.apk`.
+3. Install `renewly-beta-1.3.apk`.
 4. Restore the JSON backup.
 
 The new certificate SHA-256 fingerprint is:
@@ -196,19 +220,19 @@ The new certificate SHA-256 fingerprint is:
 Verify it with:
 
 ```bash
-apksigner verify --print-certs renewly-beta-1.2-hotfix.apk
+apksigner verify --print-certs renewly-beta-1.3.apk
 ```
 
 ### Updating from beta-1.1
 
-Installing beta-1.2-hotfix over beta-1.1 keeps the IndexedDB database, but the
+Installing beta-1.3 over beta-1.1 keeps the IndexedDB database, but the
 signing key changed. Follow the one-time reinstall steps above. There is no
 schema change; the import feature only adds rows through the existing expense
 store.
 
 ### Updating from beta-0.3
 
-Installing beta-1.2-hotfix over beta-0.3 keeps the IndexedDB database, but the
+Installing beta-1.3 over beta-0.3 keeps the IndexedDB database, but the
 signing key changed, so follow the one-time reinstall steps above. The schema
 moves from version 2 to version 3, which only adds the `transactions` and
 `goals` stores; existing subscriptions, groups, payment methods, and settings
@@ -219,7 +243,7 @@ are left alone.
 beta-0.2 through beta-1.2 used the retired beta key. beta-0.1 CI builds used a
 runner-generated debug key. If Android rejects the install with a signature
 mismatch, export your data first, uninstall once, then install
-beta-1.2-hotfix and import the JSON backup.
+beta-1.3 and import the JSON backup.
 
 ## Run it locally
 
@@ -368,9 +392,9 @@ the one-time reinstall migration is mandatory for users on older builds.
   first. Legacy `.xls` files must be saved as `.xlsx` or CSV. `.mbak`/`.mmbak`
   files must be Realbyte Money Manager backups with a readable `ZINOUTCOME`
   table. Import files are capped at 25 MB.
-- Imported expenses are only as accurate as the statement's text and the
+- Imported transactions are only as accurate as the statement's text and the
   account matching. Review the preview before committing; duplicate detection
-  uses date, amount, merchant, and method and cannot catch every reworded
+  uses date, type, amount, merchant, and method and cannot catch every reworded
   merchant.
 - The web app needs a modern browser with IndexedDB and, for Excel export,
   `CompressionStream`; without it the workbook is written uncompressed and still
@@ -389,7 +413,7 @@ public/
   js/store.js            validation, CRUD, groups, settings, subscriptions
   js/finance.js          balances, interest accrual, goals, periods
   js/insights.js         local analyst, forecasts, offline chat
-  js/import.js           import orchestrator, JSON mapping, duplicate-safe commit
+  js/import.js           import orchestrator, expense/income mapping, duplicates
   js/importers/          CSV, XLSX, PDF text, MMBAK/SQLite readers, limits
   js/export.js           CSV, XLSX, and PDF writers
   js/backup.js           JSON backup build/validate/apply (v4)

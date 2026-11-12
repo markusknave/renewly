@@ -395,6 +395,7 @@ export function summarizePeriod(transactions, { from, to } = {}) {
 	const days = new Map();
 	let expenseCents = 0;
 	let incomeCents = 0;
+	let incomeCount = 0;
 	let interestCents = 0;
 	let goalDepositCents = 0;
 	let goalWithdrawalCents = 0;
@@ -423,6 +424,7 @@ export function summarizePeriod(transactions, { from, to } = {}) {
 			if (!largest || amount > largest.amountCents) largest = transaction;
 		} else if (transaction.type === 'income') {
 			incomeCents += amount;
+			incomeCount += 1;
 		} else if (transaction.type === 'interest') {
 			interestCents += amount;
 		} else if (transaction.type === 'goal_deposit') {
@@ -454,6 +456,7 @@ export function summarizePeriod(transactions, { from, to } = {}) {
 		count: rows.filter((transaction) => transaction.type === 'expense').length,
 		expenseCents,
 		incomeCents,
+		incomeCount,
 		interestCents,
 		goalDepositCents,
 		goalWithdrawalCents,

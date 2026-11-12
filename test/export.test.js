@@ -132,6 +132,28 @@ test('CSV neutralizes formula text but keeps amounts numeric', () => {
 	assert.doesNotMatch(csv, /,'-125\.50'/);
 });
 
+test('reports keep income positive and net of expenses', () => {
+	const report = buildReport({
+		methods,
+		goals,
+		from: '2026-11-01',
+		to: '2026-11-30',
+		today: '2026-11-12',
+		transactions: [
+			{ id: 1, type: 'expense', date: '2026-11-01', amountCents: 10_000, paymentMethodId: 1, category: 'food', merchant: 'Lunch' },
+			{ id: 2, type: 'income', date: '2026-11-02', amountCents: 50_000, paymentMethodId: 1, category: 'income', merchant: 'Salary' },
+			{ id: 3, type: 'interest', date: '2026-11-03', amountCents: 500, paymentMethodId: 1, category: 'interest', merchant: 'Interest earned' },
+		],
+	});
+	assert.equal(report.rows.find((row) => row.description === 'Salary').amountCents, 50_000);
+	assert.equal(report.totals.expenseCents, 10_000);
+	assert.equal(report.totals.incomeCents, 50_500);
+	assert.equal(report.totals.netCents, 40_500);
+	const csv = toCsv(report);
+	assert.match(csv, /Salary,Income,Income,BPI Debit,500\.00/);
+	assert.match(csv, /Net,405\.00/);
+});
+
 test('XLSX output is a zip package with workbook parts', async () => {
 	const bytes = await toXlsx(sample(), new Date('2026-11-12T10:00:00Z'));
 	assert.ok(bytes instanceof Uint8Array);

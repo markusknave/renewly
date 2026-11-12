@@ -16,7 +16,7 @@ import {
 	matchMethod,
 	rowsToTransactions,
 } from './importers/table.js';
-import { detectCategory } from './lib/categories.js';
+import { detectCategory, INCOME_CATEGORY } from './lib/categories.js';
 import { MAX_IMPORT_BYTES } from './importers/limits.js';
 
 export const IMPORT_ACCEPT = '.csv,.tsv,.txt,.pdf,.xlsx,.xls,.json,.mbak,.mmbak,.sqlite,.db';
@@ -56,15 +56,19 @@ function renewlyBackupRows(data, options) {
 		])
 	);
 	const rows = (Array.isArray(data.transactions) ? data.transactions : [])
-		.filter((transaction) => transaction && transaction.type === 'expense')
+		.filter((transaction) => transaction && (transaction.type === 'expense' || transaction.type === 'income'))
 		.map((transaction) => {
+			const type = transaction.type === 'income' ? 'income' : 'expense';
 			const methodText = methodNames.get(String(transaction.paymentMethodId ?? '')) || '';
 			const paymentMethodId = matchMethod(methodText, options.methods) ?? options.defaultMethodId ?? null;
 			return {
+				type,
 				date: transaction.date,
-				merchant: String(transaction.merchant || 'Imported expense').slice(0, 60),
+				merchant: String(transaction.merchant || (type === 'income' ? 'Imported income' : 'Imported expense')).slice(0, 60),
 				amountCents: Number(transaction.amountCents) || 0,
-				category: mapCategory(transaction.category) || detectCategory(transaction.merchant || '') || 'other',
+				category: type === 'income'
+					? INCOME_CATEGORY
+					: mapCategory(transaction.category) || detectCategory(transaction.merchant || '') || 'other',
 				notes: String(transaction.notes || '').slice(0, 500),
 				paymentMethodId,
 				methodLabel: options.methods.find((method) => method.id === paymentMethodId)?.label || '',
@@ -100,14 +104,22 @@ function readJson(text, options) {
 	if (data && data.app === 'renewly') {
 		const rows = renewlyBackupRows(data, options);
 		const finalized = finalizeRows(rows, options.existing);
+		const valid = finalized.rows.filter((row) => !row.duplicate);
+		const transactions = Array.isArray(data.transactions) ? data.transactions : [];
+		const skippedKnown = transactions.filter((transaction) =>
+			transaction && ['interest', 'goal_deposit', 'goal_withdrawal'].includes(transaction.type)
+		).length;
 		return {
 			rows: finalized.rows,
 			stats: {
-				total: (data.transactions || []).length,
-				valid: finalized.rows.filter((row) => !row.duplicate).length,
-				invalid: Math.max(0, (data.transactions || []).length - rows.length),
+				total: transactions.length,
+				valid: valid.length,
+				invalid: Math.max(0, transactions.length - rows.length - skippedKnown),
 				duplicates: finalized.duplicates,
-				creditsSkipped: 0,
+				expenseCount: valid.filter((row) => row.type === 'expense').length,
+				incomeCount: valid.filter((row) => row.type === 'income').length,
+				expenseCents: valid.filter((row) => row.type === 'expense').reduce((sum, row) => sum + row.amountCents, 0),
+				incomeCents: valid.filter((row) => row.type === 'income').reduce((sum, row) => sum + row.amountCents, 0),
 			},
 			warnings: [],
 		};
@@ -128,18 +140,31 @@ function readJson(text, options) {
 }
 
 function analyze(rows) {
-	const valid = rows.filter((row) => !row.duplicate);
+	const valid = rows
+		.filter((row) => !row.duplicate)
+		.map((row) => ({ ...row, type: row.type === 'income' ? 'income' : 'expense' }));
 	if (!valid.length) {
-		return { count: 0, totalCents: 0, categories: [], from: null, to: null };
+		return {
+			count: 0,
+			expenseCount: 0,
+			incomeCount: 0,
+			expenseCents: 0,
+			incomeCents: 0,
+			netCents: 0,
+			categories: [],
+			from: null,
+			to: null,
+		};
 	}
 	const dates = valid.map((row) => row.date).sort();
-	const summary = summarizePeriod(
-		valid.map((row) => ({ ...row, type: 'expense' })),
-		{ from: dates[0], to: dates[dates.length - 1] }
-	);
+	const summary = summarizePeriod(valid, { from: dates[0], to: dates[dates.length - 1] });
 	return {
 		count: valid.length,
-		totalCents: summary.expenseCents,
+		expenseCount: summary.count,
+		incomeCount: valid.filter((row) => row.type === 'income').length,
+		expenseCents: summary.expenseCents,
+		incomeCents: summary.incomeCents,
+		netCents: summary.netCents,
 		categories: summary.categories.slice(0, 4),
 		from: dates[0],
 		to: dates[dates.length - 1],
@@ -148,11 +173,8 @@ function analyze(rows) {
 
 function warningsFor(stats, extra = []) {
 	const warnings = [...extra];
-	if (stats.creditsSkipped) {
-		warnings.push(`${stats.creditsSkipped} credit or deposit row${stats.creditsSkipped === 1 ? '' : 's'} skipped; this import adds expenses only.`);
-	}
 	if (stats.invalid) {
-		warnings.push(`${stats.invalid} row${stats.invalid === 1 ? '' : 's'} could not be read as an expense and will be skipped.`);
+		warnings.push(`${stats.invalid} row${stats.invalid === 1 ? '' : 's'} could not be read as a transaction and will be skipped.`);
 	}
 	if (stats.duplicates) {
 		warnings.push(`${stats.duplicates} row${stats.duplicates === 1 ? '' : 's'} already exist and are excluded by default.`);
@@ -205,7 +227,16 @@ export async function parseImportFile(file, options = {}) {
 	}
 
 	const rows = result.rows || [];
-	const stats = result.stats || { total: rows.length, valid: rows.length, invalid: 0, duplicates: 0, creditsSkipped: 0 };
+	const stats = result.stats || {
+		total: rows.length,
+		valid: rows.length,
+		invalid: 0,
+		duplicates: 0,
+		expenseCount: rows.filter((row) => row.type === 'expense').length,
+		incomeCount: rows.filter((row) => row.type === 'income').length,
+		expenseCents: rows.filter((row) => row.type === 'expense').reduce((sum, row) => sum + row.amountCents, 0),
+		incomeCents: rows.filter((row) => row.type === 'income').reduce((sum, row) => sum + row.amountCents, 0),
+	};
 	return {
 		fileName: name,
 		format: formatLabel(extension),
@@ -220,15 +251,17 @@ export async function importRows(db, rows, options = {}) {
 	const { defaultMethodId = null, existing = [] } = options;
 	const keys = new Set(
 		(existing || [])
-			.filter((row) => row && row.type === 'expense')
+			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
 			.map((row) =>
 				duplicateKey(
-					{ date: row.date, amountCents: row.amountCents, merchant: row.merchant },
+					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
 					row.paymentMethodId ?? null
 				)
 			)
 	);
 	let imported = 0;
+	let importedExpense = 0;
+	let importedIncome = 0;
 	let skipped = 0;
 	let failed = 0;
 	for (const row of rows || []) {
@@ -244,6 +277,7 @@ export async function importRows(db, rows, options = {}) {
 		}
 		try {
 			await store.saveExpense(db, {
+				type: row.type,
 				date: row.date,
 				merchant: row.merchant,
 				category: row.category,
@@ -253,18 +287,26 @@ export async function importRows(db, rows, options = {}) {
 			});
 			keys.add(key);
 			imported += 1;
+			if (row.type === 'income') importedIncome += 1;
+			else importedExpense += 1;
 		} catch {
 			failed += 1;
 		}
 	}
-	return { imported, skipped, failed };
+	return { imported, importedExpense, importedIncome, skipped, failed };
 }
 
 export function recategorizeRows(rows) {
-	return (rows || []).map((row) => ({
-		...row,
-		category: detectCategory(`${row.merchant} ${row.notes || ''}`) || row.category || 'other',
-	}));
+	return (rows || []).map((row) => {
+		const type = row.type === 'income' ? 'income' : 'expense';
+		return {
+			...row,
+			type,
+			category: type === 'income'
+				? INCOME_CATEGORY
+				: detectCategory(`${row.merchant} ${row.notes || ''}`) || row.category || 'other',
+		};
+	});
 }
 
 export function analyzeRows(rows) {

@@ -27,7 +27,7 @@ const state = {
 	flash: null,
 	formDraft: null,
 	notifyPermission: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
-	filters: { preset: 'this_month', from: '', to: '', category: '', methodId: '', query: '' },
+	filters: { preset: 'this_month', from: '', to: '', type: '', category: '', methodId: '', query: '' },
 	chat: [],
 	pendingExpenseOpen: false,
 	pendingGoalOpen: false,
@@ -151,7 +151,8 @@ function filterTransactions(range) {
 	const query = state.filters.query.trim().toLowerCase();
 	return state.transactions.filter((transaction) => {
 		if (!finance.inRange(transaction, range.from, range.to)) return false;
-		if (state.filters.category && (transaction.type !== 'expense' || transaction.category !== state.filters.category)) {
+		if (state.filters.type && transaction.type !== state.filters.type) return false;
+		if (state.filters.category && state.filters.type !== 'income' && (transaction.type !== 'expense' || transaction.category !== state.filters.category)) {
 			return false;
 		}
 		if (
@@ -488,6 +489,7 @@ function expenseInput(form) {
 	const fd = new FormData(form);
 	return {
 		id: form.dataset.id ? Number(form.dataset.id) : undefined,
+		type: String(fd.get('type') || 'expense'),
 		date: String(fd.get('date') || ''),
 		merchant: String(fd.get('merchant') || '').trim(),
 		category: String(fd.get('category') || 'other'),
@@ -547,6 +549,32 @@ function closeDialog(id) {
 	else dialog.removeAttribute('open');
 }
 
+function syncExpenseDialogType(form) {
+	if (!form) return;
+	const type = form.elements.type?.value === 'income' ? 'income' : 'expense';
+	const dialog = form.closest('dialog');
+	const title = dialog?.querySelector('[data-expense-dialog-title]');
+	const submit = form.querySelector('[data-expense-submit]');
+	const categoryField = form.querySelector('[data-expense-category-field]');
+	const hint = form.querySelector('[data-expense-hint]');
+	if (categoryField) categoryField.hidden = type === 'income';
+	if (form.elements.category) form.elements.category.disabled = type === 'income';
+	const editing = Boolean(form.dataset.id);
+	if (title) {
+		title.textContent =
+			type === 'income'
+				? editing ? 'Edit income' : 'Add income'
+				: editing ? 'Edit expense' : 'Add expense';
+	}
+	if (submit) submit.textContent = type === 'income' ? 'Save income' : 'Save expense';
+	if (hint) {
+		hint.textContent =
+			type === 'income'
+				? 'Saving adds the amount to the selected card or wallet.'
+				: 'Saving subtracts the amount from the selected card or wallet. Interest and goal transfers stay automatic.';
+	}
+}
+
 function openExpenseDialog(id = null) {
 	const dialog = document.getElementById('expense-dialog');
 	if (!dialog) return;
@@ -554,17 +582,18 @@ function openExpenseDialog(id = null) {
 	form.reset();
 	form.dataset.id = '';
 	const transaction = id ? state.transactions.find((row) => Number(row.id) === Number(id)) : null;
-	const title = dialog.querySelector('[data-expense-dialog-title]');
-	if (title) title.textContent = transaction ? 'Edit expense' : 'Add expense';
-	form.elements.date.value = transaction?.date || todayIso();
-	form.elements.paymentMethodId.value = transaction?.paymentMethodId ?? state.methods[0]?.id ?? '';
+	const type = transaction?.type === 'income' ? 'income' : 'expense';
+	form.elements.type.value = type;
 	if (transaction) {
 		form.dataset.id = transaction.id;
 		form.elements.amount.value = (transaction.amountCents / 100).toFixed(2);
 		form.elements.merchant.value = transaction.merchant;
-		form.elements.category.value = transaction.category;
+		form.elements.category.value = type === 'income' ? 'other' : transaction.category;
 		form.elements.notes.value = transaction.notes || '';
 	}
+	form.elements.date.value = transaction?.date || todayIso();
+	form.elements.paymentMethodId.value = transaction?.paymentMethodId ?? state.methods[0]?.id ?? '';
+	syncExpenseDialogType(form);
 	showDialog(dialog);
 	const focus = form.elements.amount;
 	if (focus) setTimeout(() => focus.focus(), 30);
@@ -869,9 +898,11 @@ async function clearData() {
 }
 
 async function deleteExpense(id) {
-	if (!confirm('Delete this expense? The card balance will go back up.')) return;
+	const transaction = state.transactions.find((row) => Number(row.id) === Number(id));
+	const isIncome = transaction?.type === 'income';
+	if (!confirm(`Delete this ${isIncome ? 'income entry' : 'expense'}? The card balance will be recalculated.`)) return;
 	await store.deleteExpense(state.db, id);
-	state.flash = { type: 'ok', message: 'Expense deleted' };
+	state.flash = { type: 'ok', message: isIncome ? 'Income deleted' : 'Expense deleted' };
 	await reload();
 	await render();
 }
@@ -924,7 +955,13 @@ async function onSubmit(event) {
 			const input = expenseInput(form);
 			await store.saveExpense(state.db, input);
 			closeDialog('expense-dialog');
-			state.flash = { type: 'ok', message: input.id ? 'Expense updated' : 'Expense added' };
+			state.flash = {
+				type: 'ok',
+				message:
+					input.type === 'income'
+						? input.id ? 'Income updated' : 'Income added'
+						: input.id ? 'Expense updated' : 'Expense added',
+			};
 			await reload();
 			await render();
 			return;
@@ -957,14 +994,21 @@ async function onSubmit(event) {
 				defaultMethodId,
 				existing: state.transactions,
 			});
+			const importedParts = [];
+			if (result.importedExpense) {
+				importedParts.push(`${result.importedExpense} expense${result.importedExpense === 1 ? '' : 's'}`);
+			}
+			if (result.importedIncome) {
+				importedParts.push(`${result.importedIncome} income entr${result.importedIncome === 1 ? 'y' : 'ies'}`);
+			}
 			state.importPreview = null;
 			state.flash = {
 				type: result.imported ? 'ok' : 'error',
 				message: result.imported
-					? `Imported ${result.imported} expense${result.imported === 1 ? '' : 's'}${
+					? `Imported ${importedParts.join(' and ')}${
 							result.skipped ? `; ${result.skipped} duplicate${result.skipped === 1 ? '' : 's'} skipped` : ''
 						}${result.failed ? `; ${result.failed} failed` : ''}`
-					: `No expenses imported${result.skipped ? `; ${result.skipped} duplicates skipped` : ''}${
+					: `No transactions imported${result.skipped ? `; ${result.skipped} duplicates skipped` : ''}${
 							result.failed ? `; ${result.failed} failed` : ''
 						}`,
 			};
@@ -1129,19 +1173,26 @@ function filterExpenseDom() {
 	const query = state.filters.query.trim().toLowerCase();
 	let count = 0;
 	let total = 0;
+	let incomeCount = 0;
+	let incomeTotal = 0;
 	for (const row of list.querySelectorAll('[data-txn]')) {
+		const matchType = !state.filters.type || row.dataset.type === state.filters.type;
 		const matchCategory =
 			!state.filters.category
+			|| state.filters.type === 'income'
 			|| (row.dataset.type === 'expense' && row.dataset.category === state.filters.category);
 		const matchMethod =
 			!state.filters.methodId || row.dataset.method === String(state.filters.methodId);
 		const matchQuery = !query || row.dataset.search.includes(query);
-		const visible = matchCategory && matchMethod && matchQuery;
+		const visible = matchType && matchCategory && matchMethod && matchQuery;
 		row.hidden = !visible;
 		if (visible) {
 			if (row.dataset.type === 'expense') {
 				count += 1;
 				total += Number(row.dataset.expenseAmount) || 0;
+			} else if (row.dataset.type === 'income') {
+				incomeCount += 1;
+				incomeTotal += Number(row.dataset.incomeAmount) || 0;
 			}
 		}
 	}
@@ -1150,8 +1201,14 @@ function filterExpenseDom() {
 	}
 	const countTarget = document.querySelector('[data-expense-count]');
 	const totalTarget = document.querySelector('[data-expense-total]');
+	const incomeCountTarget = document.querySelector('[data-income-count]');
+	const incomeTotalTarget = document.querySelector('[data-income-total]');
+	const netTarget = document.querySelector('[data-net-total]');
 	if (countTarget) countTarget.textContent = String(count);
 	if (totalTarget) totalTarget.textContent = formatMoney(total, 'PHP');
+	if (incomeCountTarget) incomeCountTarget.textContent = String(incomeCount);
+	if (incomeTotalTarget) incomeTotalTarget.textContent = formatMoney(incomeTotal, 'PHP');
+	if (netTarget) netTarget.textContent = formatMoney(incomeTotal - total, 'PHP');
 }
 
 async function onChange(event) {
@@ -1191,6 +1248,36 @@ async function onChange(event) {
 		await render();
 		return;
 	}
+	if (target.matches('[data-import-type]')) {
+		const preview = state.importPreview;
+		const index = Number(target.dataset.index);
+		if (preview?.rows?.[index]) {
+			const type = target.value === 'income' ? 'income' : 'expense';
+			const row = preview.rows[index];
+			preview.rows[index] = {
+				...row,
+				type,
+				category: type === 'income' ? 'income' : row.category === 'income' ? 'other' : row.category,
+				duplicate: false,
+			};
+			preview.analysis = analyzeRows(preview.rows);
+			preview.stats = {
+				...preview.stats,
+				expenseCount: preview.rows.filter((entry) => entry.type === 'expense').length,
+				incomeCount: preview.rows.filter((entry) => entry.type === 'income').length,
+				expenseCents: preview.rows.filter((entry) => entry.type === 'expense').reduce((sum, entry) => sum + entry.amountCents, 0),
+				incomeCents: preview.rows.filter((entry) => entry.type === 'income').reduce((sum, entry) => sum + entry.amountCents, 0),
+				duplicates: preview.rows.filter((entry) => entry.duplicate).length,
+			};
+			await render();
+		}
+		return;
+	}
+	if (target.matches('[data-expense-type-filter]')) {
+		state.filters.type = target.value;
+		filterExpenseDom();
+		return;
+	}
 	if (target.matches('[data-expense-category]')) {
 		state.filters.category = target.value;
 		filterExpenseDom();
@@ -1199,6 +1286,10 @@ async function onChange(event) {
 	if (target.matches('[data-expense-method]')) {
 		state.filters.methodId = target.value;
 		filterExpenseDom();
+		return;
+	}
+	if (target.matches('[data-expense-type]')) {
+		syncExpenseDialogType(target.closest('form'));
 		return;
 	}
 	if (target.matches('[data-transfer-goal]')) {

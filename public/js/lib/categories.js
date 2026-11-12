@@ -81,12 +81,24 @@ export const EXPENSE_CATEGORIES = [
 	},
 ];
 
+export const INCOME_CATEGORY = 'income';
+
 export const CATEGORY_KEYS = EXPENSE_CATEGORIES.map((category) => category.key);
+
+const INCOME_INFO = {
+	key: INCOME_CATEGORY,
+	label: 'Income',
+	color: '#16a34a',
+	icon: 'arrowDown',
+	keywords: [],
+};
 
 const BY_KEY = new Map(EXPENSE_CATEGORIES.map((category) => [category.key, category]));
 
 export function categoryInfo(key) {
-	return BY_KEY.get(String(key || '')) || BY_KEY.get('other');
+	const normalized = String(key || '');
+	if (normalized === INCOME_CATEGORY) return INCOME_INFO;
+	return BY_KEY.get(normalized) || BY_KEY.get('other');
 }
 
 export function categoryLabel(key) {

@@ -1,9 +1,9 @@
 // Shared tabular import mapping: turn CSV/XLSX/JSON rows or PDF statement
-// lines into expense rows using headers, column inference, and the same
-// category keywords the local analyst uses.
+// lines into expense or income transactions using headers, column inference,
+// and the same category keywords the local analyst uses.
 
 import { parseDateLoose, isValidIsoDate, parseNumericAmount } from '../lib/dates.js';
-import { detectCategory, EXPENSE_CATEGORIES } from '../lib/categories.js';
+import { detectCategory, EXPENSE_CATEGORIES, INCOME_CATEGORY } from '../lib/categories.js';
 
 const FIELD_ALIASES = {
 	debit: ['debit', 'withdrawal', 'withdrawals', 'moneyout', 'outflow', 'charged', 'charge'],
@@ -17,8 +17,11 @@ const FIELD_ALIASES = {
 	type: ['type', 'transactiontype', 'drcr', 'debitcredit', 'direction'],
 };
 
-const TYPE_CREDIT = /credit|deposit|money\s*in|inflow|paid\s*in|^in$/i;
-const TYPE_DEBIT = /debit|withdraw|money\s*out|outflow|charge|^out$/i;
+const INCOME_TYPE = /^(credit|income|deposit|inflow|moneyin|paidin|in|salary|payroll|refund|interest)$/i;
+const EXPENSE_TYPE = /^(debit|expense|withdrawal|withdraw|outflow|moneyout|charge|out|purchase|payment)$/i;
+const INCOME_TEXT = /\b(salary|payroll|refund|interest\s+(?:earned|received)|cash\s+in|deposit|money\s+in|inflow|credit)\b/i;
+const EXPENSE_TEXT = /\b(expense|purchase|payment|withdrawal|debit|money\s+out|outflow|charge)\b/i;
+const CREDIT_CARD_TEXT = /\bcredit\s*card\b/i;
 
 function escapeRegex(value) {
 	return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -37,6 +40,20 @@ export function normalizeMerchant(value) {
 		.replace(/[^a-z0-9]+/g, ' ')
 		.trim()
 		.replace(/\s+/g, ' ');
+}
+
+function classifyType(typeText, categoryText, descriptionText = '') {
+	const type = normalizeHeader(typeText);
+	if (EXPENSE_TYPE.test(type)) return 'expense';
+	if (INCOME_TYPE.test(type)) return 'income';
+	const category = normalizeHeader(categoryText);
+	if (EXPENSE_TYPE.test(category)) return 'expense';
+	if (INCOME_TYPE.test(category)) return 'income';
+	const text = `${categoryText} ${descriptionText}`.trim();
+	if (!text) return null;
+	if (INCOME_TEXT.test(text) && !CREDIT_CARD_TEXT.test(text)) return 'income';
+	if (EXPENSE_TEXT.test(text)) return 'expense';
+	return null;
 }
 
 function cell(row, index) {
@@ -219,6 +236,7 @@ export function matchMethod(value, methods = []) {
 export function duplicateKey(row, paymentMethodId = null) {
 	return [
 		row.date,
+		row.type === 'income' ? 'income' : 'expense',
 		row.amountCents,
 		normalizeMerchant(row.merchant),
 		paymentMethodId ?? '',
@@ -228,10 +246,10 @@ export function duplicateKey(row, paymentMethodId = null) {
 export function finalizeRows(rows, existing = []) {
 	const keys = new Set(
 		(Array.isArray(existing) ? existing : [])
-			.filter((row) => row && row.type === 'expense')
+			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
 			.map((row) =>
 				duplicateKey(
-					{ date: row.date, amountCents: row.amountCents, merchant: row.merchant },
+					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
 					row.paymentMethodId ?? null
 				)
 			)
@@ -247,12 +265,6 @@ export function finalizeRows(rows, existing = []) {
 		return { ...row, duplicate: false };
 	});
 	return { rows: finalized, duplicates };
-}
-
-function looksLikeCredit(typeText, description) {
-	if (TYPE_DEBIT.test(typeText || '')) return false;
-	if (TYPE_CREDIT.test(typeText || '')) return true;
-	return TYPE_CREDIT.test(description || '') && !TYPE_DEBIT.test(description || '');
 }
 
 export function rowsToTransactions(rows, options = {}) {
@@ -283,21 +295,24 @@ export function rowsToTransactions(rows, options = {}) {
 
 	const dataRows = headerIndex >= 0 ? rows.slice(headerIndex + 1) : rows;
 	if (mapping.type < 0 && mapping.category >= 0) {
-		const sample = dataRows
+		const headerText = normalizeHeader(rows[headerIndex]?.[mapping.category]);
+		const values = dataRows
 			.slice(0, 20)
-			.map((row) => String(cell(row, mapping.category) || ''))
-			.join(' ');
-		if (/(debit|credit|withdraw|deposit|money\s*in|money\s*out|^in$|^out$)/i.test(sample)) {
+			.map((row) => String(cell(row, mapping.category) || '').trim())
+			.filter(Boolean);
+		const typeLike = values.filter((value) => /^(debit|credit|withdraw|deposit|moneyin|moneyout|income|expense|salary|refund|in|out)$/i.test(value)).length;
+		const headerLooksType = /^(type|transactiontype|drcr|debitcredit|direction)$/.test(headerText);
+		if (headerLooksType || (values.length > 0 && typeLike >= Math.ceil(values.length * 0.6))) {
 			mapping.type = mapping.category;
 			mapping.category = -1;
 		}
 	}
 	const existingKeys = new Set(
 		(Array.isArray(existing) ? existing : [])
-			.filter((row) => row && row.type === 'expense')
+			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
 			.map((row) =>
 				duplicateKey(
-					{ date: row.date, amountCents: row.amountCents, merchant: row.merchant },
+					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
 					row.paymentMethodId ?? null
 				)
 			)
@@ -305,8 +320,11 @@ export function rowsToTransactions(rows, options = {}) {
 	const seen = new Set();
 	const transactions = [];
 	let invalid = 0;
-	let creditsSkipped = 0;
 	let duplicates = 0;
+	let expenseCount = 0;
+	let incomeCount = 0;
+	let expenseCents = 0;
+	let incomeCents = 0;
 
 	for (const row of dataRows) {
 		if (!Array.isArray(row) || row.every((value) => String(value ?? '').trim() === '')) continue;
@@ -318,20 +336,22 @@ export function rowsToTransactions(rows, options = {}) {
 		}
 		const typeText = String(cell(row, mapping.type) || '');
 		const categoryText = String(cell(row, mapping.category) || '').trim();
-		if (
-			looksLikeCredit(typeText, categoryText)
-			|| /^(income|credit|deposit|salary|refund|transfer)$/i.test(categoryText)
-		) {
-			creditsSkipped += 1;
-			continue;
-		}
 		const descriptionCell = String(cell(row, mapping.description) || '').trim();
+		let type = classifyType(typeText, categoryText, descriptionCell);
 
 		let amountCents = null;
-		if (mapping.debit >= 0 && String(cell(row, mapping.debit)).trim()) {
-			amountCents = parseMoney(cell(row, mapping.debit));
-		} else if (mapping.credit >= 0 && String(cell(row, mapping.credit)).trim()) {
-			creditsSkipped += 1;
+		const debitText = mapping.debit >= 0 ? String(cell(row, mapping.debit) || '').trim() : '';
+		const creditText = mapping.credit >= 0 ? String(cell(row, mapping.credit) || '').trim() : '';
+		const debitCents = debitText ? parseMoney(debitText) : null;
+		const creditCents = creditText ? parseMoney(creditText) : null;
+		if (debitCents) {
+			amountCents = debitCents;
+			type = 'expense';
+		} else if (creditCents) {
+			amountCents = creditCents;
+			type = 'income';
+		} else if (debitText || creditText) {
+			invalid += 1;
 			continue;
 		} else {
 			const amountHeader = mapping.amount >= 0 ? String(rows[headerIndex]?.[mapping.amount] ?? '') : '';
@@ -340,7 +360,9 @@ export function rowsToTransactions(rows, options = {}) {
 			amountCents = centsColumn && typeof rawAmount === 'number'
 				? Math.round(Math.abs(rawAmount))
 				: parseMoney(rawAmount);
+			if (!type) type = 'expense';
 		}
+		type = type === 'income' ? 'income' : 'expense';
 		if (!amountCents) {
 			invalid += 1;
 			continue;
@@ -351,14 +373,15 @@ export function rowsToTransactions(rows, options = {}) {
 			.map((value) => String(value ?? '').trim())
 			.filter(Boolean)
 			.join(' ')
-			.slice(0, 60) || 'Imported expense';
+			.slice(0, 60) || (type === 'income' ? 'Imported income' : 'Imported expense');
 		const notes = String(cell(row, mapping.notes) || '').trim().slice(0, 500);
-		const category = mapCategory(categoryText)
-			|| detectCategory(`${description} ${notes}`)
-			|| 'other';
+		const category = type === 'income'
+			? INCOME_CATEGORY
+			: mapCategory(categoryText) || detectCategory(`${description} ${notes}`) || 'other';
 		const methodText = cell(row, mapping.method);
 		const paymentMethodId = matchMethod(methodText, methods) ?? defaultMethodId ?? null;
 		const transaction = {
+			type,
 			date,
 			merchant: description.slice(0, 60),
 			amountCents,
@@ -368,6 +391,13 @@ export function rowsToTransactions(rows, options = {}) {
 			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
 			source: sourceLabel,
 		};
+		if (type === 'income') {
+			incomeCount += 1;
+			incomeCents += amountCents;
+		} else {
+			expenseCount += 1;
+			expenseCents += amountCents;
+		}
 		const key = duplicateKey(transaction, paymentMethodId);
 		if (existingKeys.has(key) || seen.has(key)) {
 			transaction.duplicate = true;
@@ -384,7 +414,10 @@ export function rowsToTransactions(rows, options = {}) {
 			valid: transactions.filter((row) => !row.duplicate).length,
 			invalid,
 			duplicates,
-			creditsSkipped,
+			expenseCount,
+			incomeCount,
+			expenseCents,
+			incomeCents,
 		},
 	};
 }
@@ -407,10 +440,10 @@ export function linesToTransactions(lines, options = {}) {
 	} = options;
 	const existingKeys = new Set(
 		(existing || [])
-			.filter((row) => row && row.type === 'expense')
+			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
 			.map((row) =>
 				duplicateKey(
-					{ date: row.date, amountCents: row.amountCents, merchant: row.merchant },
+					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
 					row.paymentMethodId ?? null
 				)
 			)
@@ -418,8 +451,11 @@ export function linesToTransactions(lines, options = {}) {
 	const seen = new Set();
 	const transactions = [];
 	let invalid = 0;
-	let creditsSkipped = 0;
 	let duplicates = 0;
+	let expenseCount = 0;
+	let incomeCount = 0;
+	let expenseCents = 0;
+	let incomeCents = 0;
 
 	const datePattern = /(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4})/i;
 	const amountPattern = /([-−]?\s*(?:₱|php|p)?\s*\(?\d[\d,]*\.\d{2}\)?)\s*$/i;
@@ -443,10 +479,7 @@ export function linesToTransactions(lines, options = {}) {
 			invalid += 1;
 			continue;
 		}
-		if (TYPE_CREDIT.test(line) && !TYPE_DEBIT.test(line)) {
-			creditsSkipped += 1;
-			continue;
-		}
+		const type = classifyType('', '', line) === 'income' ? 'income' : 'expense';
 		const amountCents = parseMoney(amountMatch[1]);
 		if (!amountCents) {
 			invalid += 1;
@@ -458,7 +491,7 @@ export function linesToTransactions(lines, options = {}) {
 			.replace(/\s{2,}/g, ' ')
 			.replace(/^[\s|•·-]+|[\s|•·-]+$/g, '')
 			.trim();
-		if (!rawDescription) rawDescription = 'Imported PDF expense';
+		if (!rawDescription) rawDescription = type === 'income' ? 'Imported PDF income' : 'Imported PDF expense';
 		const methodText = methods.find((method) => matchMethod(rawDescription, [method]) === method.id)?.label || '';
 		let description = rawDescription;
 		if (methodText) {
@@ -471,9 +504,10 @@ export function linesToTransactions(lines, options = {}) {
 			description = description.replace(new RegExp(`\\s+${escapeRegex(category.label)}$`, 'i'), '').trim();
 		}
 		if (!description) description = rawDescription;
-		const category = detectCategory(rawDescription) || 'other';
+		const category = type === 'income' ? INCOME_CATEGORY : detectCategory(rawDescription) || 'other';
 		const paymentMethodId = matchMethod(methodText, methods) ?? defaultMethodId ?? null;
 		const transaction = {
+			type,
 			date,
 			merchant: description.slice(0, 60),
 			amountCents,
@@ -483,6 +517,13 @@ export function linesToTransactions(lines, options = {}) {
 			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
 			source: sourceLabel,
 		};
+		if (type === 'income') {
+			incomeCount += 1;
+			incomeCents += amountCents;
+		} else {
+			expenseCount += 1;
+			expenseCents += amountCents;
+		}
 		const key = duplicateKey(transaction, paymentMethodId);
 		if (existingKeys.has(key) || seen.has(key)) {
 			transaction.duplicate = true;
@@ -499,7 +540,10 @@ export function linesToTransactions(lines, options = {}) {
 			valid: transactions.filter((row) => !row.duplicate).length,
 			invalid,
 			duplicates,
-			creditsSkipped,
+			expenseCount,
+			incomeCount,
+			expenseCents,
+			incomeCents,
 		},
 	};
 }

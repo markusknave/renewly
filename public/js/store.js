@@ -1,4 +1,4 @@
-import { CATEGORY_KEYS } from './lib/categories.js';
+import { CATEGORY_KEYS, INCOME_CATEGORY } from './lib/categories.js';
 import { INSTRUMENTS, instrumentFor } from './lib/cardThemes.js';
 import {
 	INTEREST_FREQUENCIES,
@@ -753,7 +753,15 @@ export function summarize(subscriptions, options = {}) {
 export function validateExpenseInput(input) {
   const errors = {};
   const source = isPlainObject(input) ? input : {};
-  if (!isPlainObject(input)) errors.form = 'Expense details are required.';
+  if (!isPlainObject(input)) errors.form = 'Transaction details are required.';
+
+  const rawType = source.type === undefined || source.type === null || source.type === ''
+    ? 'expense'
+    : source.type;
+  if (rawType !== 'expense' && rawType !== 'income') {
+    errors.type = 'Type must be expense or income.';
+  }
+  const type = rawType === 'income' ? 'income' : 'expense';
 
   const date = normalizeDate(source.date, errors, 'date', 'Date');
   if (!date) errors.date = 'Date is required (YYYY-MM-DD).';
@@ -765,8 +773,10 @@ export function validateExpenseInput(input) {
     errors.merchant = `Description must be ${MAX_EXPENSE_MERCHANT} characters or fewer.`;
   }
 
-  const category = trimString(source.category) || 'other';
-  if (!CATEGORY_KEYS.includes(category)) errors.category = 'Category is not recognized.';
+  const category = type === 'income' ? INCOME_CATEGORY : trimString(source.category) || 'other';
+  if (type === 'expense' && !CATEGORY_KEYS.includes(category)) {
+    errors.category = 'Category is not recognized.';
+  }
 
   const rawAmount = typeof source.amountCents === 'string' && source.amountCents.trim()
     ? Number(source.amountCents)
@@ -790,7 +800,7 @@ export function validateExpenseInput(input) {
   const id = normalizeId(source.id, errors);
 
   const data = {
-    type: 'expense',
+    type,
     date,
     merchant,
     category,
