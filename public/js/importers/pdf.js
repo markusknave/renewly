@@ -2,13 +2,20 @@
 // inflating content streams and reading the text operators. Scanned/image-only
 // PDFs have no text layer and are rejected with a clear message.
 
+import {
+	MAX_PDF_STREAM_BYTES,
+	MAX_PDF_STREAMS,
+	MAX_PDF_TEXT_BYTES,
+	readLimitedStream,
+} from './limits.js';
+
 const latin1 = new TextDecoder('latin1');
 
 async function inflate(bytes, format) {
 	if (typeof DecompressionStream === 'undefined') return null;
 	try {
 		const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(format));
-		return new Uint8Array(await new Response(stream).arrayBuffer());
+		return readLimitedStream(stream, MAX_PDF_STREAM_BYTES, 'The PDF stream');
 	} catch {
 		return null;
 	}
@@ -325,6 +332,8 @@ export async function extractPdfText(bytes) {
 	const raw = latin1.decode(bytes);
 	const lines = [];
 	let position = 0;
+	let streams = 0;
+	let textBytes = 0;
 	while (position < raw.length) {
 		const start = raw.indexOf('stream', position);
 		if (start < 0) break;
@@ -332,6 +341,8 @@ export async function extractPdfText(bytes) {
 			position = start + 6;
 			continue;
 		}
+		streams += 1;
+		if (streams > MAX_PDF_STREAMS) throw new Error('The PDF has too many content streams.');
 		const dictionaryStart = raw.lastIndexOf('<<', start);
 		const dictionary = dictionaryStart >= 0 ? raw.slice(dictionaryStart, start) : '';
 		let dataStart = start + 6;
@@ -346,6 +357,8 @@ export async function extractPdfText(bytes) {
 		const data = bytes.subarray(dataStart, dataEnd);
 		const content = await decodeStream(dictionary, data);
 		if (content && (content.includes('Tj') || content.includes('TJ'))) {
+			textBytes += content.length;
+			if (textBytes > MAX_PDF_TEXT_BYTES) throw new Error('The PDF contains too much text.');
 			lines.push(...groupLines(parseContent(content)));
 		}
 		position = Math.min(raw.length, dataEnd + 9);

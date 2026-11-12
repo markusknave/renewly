@@ -74,7 +74,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 				<span class="muted small">CSV, PDF, Excel (.xlsx), JSON, or Money Manager .mbak/.mmbak</span>
 			</span>
 		</label>
-		<p class="hint">PDF import reads selectable text. Scanned image statements need OCR first. Legacy .xls files should be saved as .xlsx or CSV. The local analyst infers categories and matches accounts; nothing is uploaded.</p>
+		<p class="hint">PDF import reads selectable text. Scanned image statements need OCR first. Legacy .xls files should be saved as .xlsx or CSV. Files are capped at 25 MB. The local analyst infers categories and matches accounts; nothing is uploaded.</p>
 	</section>
 
 	${

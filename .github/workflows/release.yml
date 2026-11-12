@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "beta-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RENEWLY_KEYSTORE_BASE64: ${{ secrets.RENEWLY_KEYSTORE_BASE64 }}
+      RENEWLY_STORE_PASSWORD: ${{ secrets.RENEWLY_STORE_PASSWORD }}
+      RENEWLY_KEY_ALIAS: ${{ secrets.RENEWLY_KEY_ALIAS }}
+      RENEWLY_KEY_PASSWORD: ${{ secrets.RENEWLY_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Set up Android SDK
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDKMANAGER="$(command -v sdkmanager || find "$SDK_ROOT" -name sdkmanager -type f | head -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found under $SDK_ROOT"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          dirname "$SDKMANAGER" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/build-tools/36.0.0" >> "$GITHUB_PATH"
+      - run: npm ci
+      - run: npm run test:coverage
+      - run: npm run security:check
+      - run: npm run security:audit
+      - name: Install gitleaks and actionlint
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.29.1/gitleaks_8.29.1_linux_x64.tar.gz | tar -xz -C /usr/local/bin gitleaks
+          curl -sSfL https://github.com/rhysd/actionlint/releases/download/v1.7.9/actionlint_1.7.9_linux_amd64.tar.gz | tar -xz -C /usr/local/bin actionlint
+      - run: gitleaks detect --no-git --source . --redact --config .gitleaks.toml
+      - run: actionlint
+      - name: Decode signing key
+        run: |
+          if [ -z "$RENEWLY_KEYSTORE_BASE64" ]; then
+            echo "RENEWLY_KEYSTORE_BASE64 is not configured."
+            exit 1
+          fi
+          printf '%s' "$RENEWLY_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/renewly-beta.p12"
+          echo "RENEWLY_KEYSTORE_FILE=$RUNNER_TEMP/renewly-beta.p12" >> "$GITHUB_ENV"
+      - run: npx cap sync android
+      - name: Build signed release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Verify signature
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          apksigner verify --print-certs "$APK"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          APK="renewly-${TAG}.apk"
+          SHA="${APK}.sha256"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+          sha256sum "$APK" > "$SHA"
+          cat "$SHA"
+          if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" "$SHA" --clobber --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "$TAG" "$APK" "$SHA" \
+              --title "Renewly ${TAG}" \
+              --notes-file "docs/releases/${TAG}.md" \
+              --repo "${GITHUB_REPOSITORY}"
+          fi

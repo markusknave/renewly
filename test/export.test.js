@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
@@ -103,6 +103,33 @@ test('CSV escapes commas, quotes, and newlines and includes a BOM', () => {
 	assert.match(csv, /Total spend,1024\.50/);
 	assert.match(csv, /Income and interest,0\.00/);
 	assert.match(csv, /Net,-1024\.50/);
+});
+
+test('CSV neutralizes formula text but keeps amounts numeric', () => {
+	const report = buildReport({
+		methods: [{ id: 1, label: '=HYPERLINK("https://evil.example")' }],
+		goals: [],
+		from: '2026-11-01',
+		to: '2026-11-30',
+		today: '2026-11-12',
+		transactions: [
+			{
+				id: 1,
+				type: 'expense',
+				date: '2026-11-01',
+				amountCents: 12_550,
+				paymentMethodId: 1,
+				category: 'food',
+				merchant: '=HYPERLINK("https://evil.example","Open")',
+				notes: '@SUM(A1:A2)',
+			},
+		],
+	});
+	const csv = toCsv(report);
+	assert.match(csv, /'=HYPERLINK\(""https:\/\/evil\.example""\)/);
+	assert.match(csv, /'@SUM\(A1:A2\)/);
+	assert.match(csv, /,-125\.50,/);
+	assert.doesNotMatch(csv, /,'-125\.50'/);
 });
 
 test('XLSX output is a zip package with workbook parts', async () => {

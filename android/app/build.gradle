@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def betaStorePath = System.getenv('RENEWLY_KEYSTORE_FILE')
+def betaStorePassword = System.getenv('RENEWLY_STORE_PASSWORD')
+def betaKeyAlias = System.getenv('RENEWLY_KEY_ALIAS')
+def betaKeyPassword = System.getenv('RENEWLY_KEY_PASSWORD')
+def hasBetaSigning = betaStorePath && new File(betaStorePath).isFile() && betaStorePassword && betaKeyAlias && betaKeyPassword
+
 android {
     namespace = "com.renewly.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +13,8 @@ android {
         applicationId "com.renewly.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
-        versionName "1.2.0"
+        versionCode 6
+        versionName "1.2.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,23 +23,25 @@ android {
         }
     }
     signingConfigs {
-        beta {
-            // Stable beta key so every sideload APK upgrades in place. A fresh
-            // runner-generated debug key would make Android reject the update
-            // and force an uninstall, clearing app data.
-            storeFile file('../keystore/renewly-beta.p12')
-            storeType 'PKCS12'
-            storePassword 'renewly-beta'
-            keyAlias 'renewly-beta'
-            keyPassword 'renewly-beta'
+        if (hasBetaSigning) {
+            beta {
+                // The beta keystore lives in GitHub Actions secrets, never in
+                // this repository. Set RENEWLY_KEYSTORE_FILE to the decoded
+                // PKCS12 path and provide the three matching secrets.
+                storeFile file(betaStorePath)
+                storeType 'PKCS12'
+                storePassword betaStorePassword
+                keyAlias betaKeyAlias
+                keyPassword betaKeyPassword
+            }
         }
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.beta
+            if (hasBetaSigning) signingConfig signingConfigs.beta
         }
         release {
-            signingConfig signingConfigs.beta
+            if (hasBetaSigning) signingConfig signingConfigs.beta
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

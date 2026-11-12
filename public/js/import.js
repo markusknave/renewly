@@ -17,6 +17,7 @@ import {
 	rowsToTransactions,
 } from './importers/table.js';
 import { detectCategory } from './lib/categories.js';
+import { MAX_IMPORT_BYTES } from './importers/limits.js';
 
 export const IMPORT_ACCEPT = '.csv,.tsv,.txt,.pdf,.xlsx,.xls,.json,.mbak,.mmbak,.sqlite,.db';
 
@@ -162,7 +163,13 @@ function warningsFor(stats, extra = []) {
 export async function parseImportFile(file, options = {}) {
 	const name = String(file?.name || 'import');
 	const extension = name.toLowerCase().split('.').pop() || '';
+	if (Number(file?.size) > MAX_IMPORT_BYTES) {
+		throw new Error(`Files larger than ${Math.round(MAX_IMPORT_BYTES / 1024 / 1024)} MB are not imported.`);
+	}
 	const bytes = new Uint8Array(await file.arrayBuffer());
+	if (bytes.byteLength > MAX_IMPORT_BYTES) {
+		throw new Error(`Files larger than ${Math.round(MAX_IMPORT_BYTES / 1024 / 1024)} MB are not imported.`);
+	}
 	const common = {
 		today: options.today,
 		methods: options.methods || [],

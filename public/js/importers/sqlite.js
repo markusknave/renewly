@@ -45,10 +45,12 @@ function decodeText(bytes, encoding) {
 
 function parseRecord(payload, encoding) {
 	const header = readVarint(payload, 0);
+	if (header.length === 0 || header.value < header.length || header.value > payload.length) return [];
 	let position = header.length;
 	const types = [];
-	while (position < header.value) {
+	while (position < header.value && types.length < 2048) {
 		const serial = readVarint(payload, position);
+		if (serial.length === 0) break;
 		types.push(serial.value);
 		position += serial.length;
 	}
@@ -59,9 +61,11 @@ function parseRecord(payload, encoding) {
 			values.push(null);
 		} else if (type >= 1 && type <= 6) {
 			const length = [0, 1, 2, 3, 4, 6, 8][type];
+			if (data + length > payload.length) break;
 			values.push(readIntBE(payload, data, length));
 			data += length;
 		} else if (type === 7) {
+			if (data + 8 > payload.length) break;
 			const view = new DataView(payload.buffer, payload.byteOffset + data, 8);
 			values.push(view.getFloat64(0, false));
 			data += 8;
@@ -71,10 +75,12 @@ function parseRecord(payload, encoding) {
 			values.push(1);
 		} else if (type >= 12 && type % 2 === 0) {
 			const length = (type - 12) / 2;
+			if (data + length > payload.length) break;
 			values.push(payload.subarray(data, data + length));
 			data += length;
 		} else if (type >= 13) {
 			const length = (type - 13) / 2;
+			if (data + length > payload.length) break;
 			values.push(decodeText(payload.subarray(data, data + length), encoding));
 			data += length;
 		} else {
@@ -87,38 +93,59 @@ function parseRecord(payload, encoding) {
 export function readSqliteTables(bytes) {
 	const magic = textDecoder.decode(bytes.subarray(0, 16));
 	if (magic !== 'SQLite format 3\u0000') throw new Error('The file is not a SQLite database.');
+	if (bytes.length < 100) throw new Error('The SQLite database is truncated.');
 	const pageSize = readUint16BE(bytes, 16) || 65_536;
+	if (pageSize < 512 || pageSize > 65_536 || (pageSize & (pageSize - 1)) !== 0) {
+		throw new Error('The SQLite database has an invalid page size.');
+	}
 	const reserved = bytes[20] || 0;
 	const usable = pageSize - reserved;
+	if (reserved >= pageSize || usable < 480) throw new Error('The SQLite database has an invalid page layout.');
 	const encoding = readUint32BE(bytes, 56) || 1;
 	const pageCache = new Map();
+	const maxPages = Math.ceil(bytes.length / pageSize) + 1;
 
 	const page = (pageNumber) => {
+		if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > maxPages) {
+			throw new Error('The SQLite database references a page outside the file.');
+		}
 		if (pageCache.has(pageNumber)) return pageCache.get(pageNumber);
 		const start = (pageNumber - 1) * pageSize;
 		const slice = bytes.subarray(start, start + pageSize);
+		if (!slice.length) throw new Error('The SQLite database references an empty page.');
 		pageCache.set(pageNumber, slice);
 		return slice;
 	};
 
 	const readPayload = (pageBytes, pageNumber, offset, payloadLength) => {
+		if (!Number.isFinite(payloadLength) || payloadLength < 0 || payloadLength > bytes.length) {
+			throw new Error('The SQLite database has an invalid payload length.');
+		}
 		const maxLocal = usable - 35;
-		const minLocal = Math.floor(((usable - 12) * 32) / 255) - 23;
+		const minLocal = Math.max(0, Math.floor(((usable - 12) * 32) / 255) - 23);
 		let local = payloadLength;
 		if (payloadLength > maxLocal) {
 			local = minLocal + ((payloadLength - minLocal) % (usable - 4));
 			if (local > maxLocal) local = minLocal;
 		}
+		if (offset + local > pageBytes.length) throw new Error('The SQLite payload is truncated.');
 		const parts = [pageBytes.subarray(offset, offset + local)];
 		let remaining = payloadLength - local;
 		let nextPage = remaining > 0 ? readUint32BE(pageBytes, offset + local) : 0;
+		const visited = new Set();
 		while (remaining > 0 && nextPage) {
+			if (visited.has(nextPage) || visited.size > maxPages) {
+				throw new Error('The SQLite overflow chain is cyclic.');
+			}
+			visited.add(nextPage);
 			const overflow = page(nextPage);
+			if (overflow.length < 4) throw new Error('The SQLite overflow page is truncated.');
 			nextPage = readUint32BE(overflow, 0);
 			const take = Math.min(remaining, usable - 4);
 			parts.push(overflow.subarray(4, 4 + take));
 			remaining -= take;
 		}
+		if (remaining > 0) throw new Error('The SQLite overflow chain is truncated.');
 		const total = parts.reduce((sum, part) => sum + part.length, 0);
 		const payload = new Uint8Array(total);
 		let cursor = 0;
@@ -130,25 +157,31 @@ export function readSqliteTables(bytes) {
 	};
 
 	const walk = (rootPage, output, visited = new Set()) => {
-		if (!rootPage || visited.has(rootPage)) return;
+		if (!rootPage || visited.has(rootPage) || visited.size > maxPages) return;
 		visited.add(rootPage);
 		const pageBytes = page(rootPage);
 		const headerOffset = rootPage === 1 ? 100 : 0;
 		const type = pageBytes[headerOffset];
 		if (type === 0x0d) {
-			const cellCount = readUint16BE(pageBytes, headerOffset + 3);
+			const cellCount = Math.min(readUint16BE(pageBytes, headerOffset + 3), 4096);
 			for (let index = 0; index < cellCount; index += 1) {
 				const pointer = readUint16BE(pageBytes, headerOffset + 8 + index * 2);
+				if (pointer >= pageBytes.length) break;
 				const length = readVarint(pageBytes, pointer);
+				if (length.length === 0 || length.value > bytes.length) break;
 				const rowid = readVarint(pageBytes, pointer + length.length);
+				if (rowid.length === 0) break;
 				const payloadOffset = pointer + length.length + rowid.length;
+				if (payloadOffset >= pageBytes.length) break;
 				const payload = readPayload(pageBytes, rootPage, payloadOffset, length.value);
 				output.push({ values: parseRecord(payload, encoding), rowid: rowid.value });
+				if (output.length >= 200_000) return;
 			}
 		} else if (type === 0x05) {
-			const cellCount = readUint16BE(pageBytes, headerOffset + 3);
+			const cellCount = Math.min(readUint16BE(pageBytes, headerOffset + 3), 4096);
 			for (let index = 0; index < cellCount; index += 1) {
 				const pointer = readUint16BE(pageBytes, headerOffset + 12 + index * 2);
+				if (pointer >= pageBytes.length) break;
 				const child = readUint32BE(pageBytes, pointer);
 				walk(child, output, visited);
 			}

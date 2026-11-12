@@ -89,17 +89,25 @@ function csvCell(value) {
 	return `"${text.replace(/"/g, '""')}"`;
 }
 
+// Spreadsheet apps treat a leading =, +, -, @, TAB, or CR as a formula.
+// Prefix text cells with an apostrophe so imported merchant and note text
+// cannot execute when the CSV is opened. Amount cells stay numeric.
+function csvText(value) {
+	const text = String(value ?? '');
+	return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+}
+
 export function toCsv(report) {
 	const lines = [
 		['Date', 'Description', 'Category', 'Type', 'Payment method', 'Amount (PHP)', 'Notes'],
 		...report.rows.map((row) => [
 			row.date,
-			row.description,
-			row.category,
-			row.type,
-			row.method,
+			csvText(row.description),
+			csvText(row.category),
+			csvText(row.type),
+			csvText(row.method),
 			amountText(row.amountCents),
-			row.notes,
+			csvText(row.notes),
 		]),
 		[],
 		['Total spend', amountText(report.totals.expenseCents)],
