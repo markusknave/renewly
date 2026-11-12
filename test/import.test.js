@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,9 +7,10 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { parseImportFile, importRows, recategorizeRows, analyzeRows } from '../public/js/import.js';
 import { parseCsv } from '../public/js/importers/csv.js';
-import { readXlsx } from '../public/js/importers/xlsx.js';
+import { readXlsx, readZip } from '../public/js/importers/xlsx.js';
 import { extractPdfText } from '../public/js/importers/pdf.js';
-import { readMmbak } from '../public/js/importers/sqlite.js';
+import { readMmbak, readSqliteTables } from '../public/js/importers/sqlite.js';
+import { MAX_IMPORT_BYTES } from '../public/js/importers/limits.js';
 import { rowsToTransactions, linesToTransactions, parseAnyDate, parseMoney } from '../public/js/importers/table.js';
 import { buildReport, toPdf, toXlsx } from '../public/js/export.js';
 import { createMemoryBackend } from '../public/js/db.js';
@@ -213,4 +214,96 @@ test('analyst helpers recategorize and summarize imported rows', () => {
 	assert.equal(analysis.count, 2);
 	assert.equal(analysis.totalCents, 175_000);
 	assert.equal(analysis.categories[0].key, 'bills');
+});
+
+function varintBytes(value) {
+	const bytes = [];
+	do {
+		bytes.unshift(value & 0x7f);
+		value = Math.floor(value / 128);
+	} while (value > 0);
+	for (let index = 0; index < bytes.length - 1; index += 1) bytes[index] |= 0x80;
+	return bytes;
+}
+
+function sqliteFixture(payloadLength, headerByte = 1, overflowPage = 0) {
+	const pageSize = 4096;
+	const bytes = new Uint8Array(pageSize * 5);
+	bytes.set(new TextEncoder().encode('SQLite format 3\0'), 0);
+	bytes[16] = 0x10;
+	bytes[17] = 0x00;
+	bytes[18] = 1;
+	bytes[19] = 1;
+	bytes[20] = 0;
+	bytes[56] = 0;
+	bytes[57] = 0;
+	bytes[58] = 0;
+	bytes[59] = 1;
+	bytes[100] = 0x0d;
+	bytes[103] = 0;
+	bytes[104] = 1;
+	bytes[108] = 0;
+	bytes[109] = 200;
+	let offset = 200;
+	const lengthBytes = varintBytes(payloadLength);
+	bytes.set(lengthBytes, offset);
+	offset += lengthBytes.length;
+	bytes[offset] = 1;
+	offset += 1;
+	bytes[offset] = headerByte;
+	const usable = pageSize;
+	const maxLocal = usable - 35;
+	const minLocal = Math.max(0, Math.floor(((usable - 12) * 32) / 255) - 23);
+	let local = payloadLength;
+	if (payloadLength > maxLocal) {
+		local = minLocal + ((payloadLength - minLocal) % (usable - 4));
+		if (local > maxLocal) local = minLocal;
+	}
+	if (overflowPage) {
+		const pointer = offset + local;
+		bytes[pointer] = (overflowPage >>> 24) & 255;
+		bytes[pointer + 1] = (overflowPage >>> 16) & 255;
+		bytes[pointer + 2] = (overflowPage >>> 8) & 255;
+		bytes[pointer + 3] = overflowPage & 255;
+		bytes[pageSize] = (overflowPage >>> 24) & 255;
+		bytes[pageSize + 1] = (overflowPage >>> 16) & 255;
+		bytes[pageSize + 2] = (overflowPage >>> 8) & 255;
+		bytes[pageSize + 3] = overflowPage & 255;
+	}
+	return bytes;
+}
+
+test('SQLite parser rejects invalid page sizes and short record headers', () => {
+	const invalidPage = sqliteFixture(10);
+	invalidPage[16] = 0;
+	invalidPage[17] = 100;
+	assert.throws(() => readSqliteTables(invalidPage), /invalid page size/);
+
+	const shortHeader = sqliteFixture(10, 0x7f);
+	assert.equal(readSqliteTables(shortHeader).size, 0);
+});
+
+test('SQLite parser stops cyclic overflow chains', () => {
+	const cyclic = sqliteFixture(14_000, 1, 2);
+	assert.throws(() => readSqliteTables(cyclic), /cyclic/);
+});
+
+test('ZIP and import size guards reject oversized input', async () => {
+	const zip = new Uint8Array(22);
+	zip.set([0x50, 0x4b, 0x05, 0x06], 0);
+	zip[10] = 0xff;
+	zip[11] = 0xff;
+	await assert.rejects(readZip(zip), /more than/);
+
+	const oversized = {
+		name: 'statement.csv',
+		size: MAX_IMPORT_BYTES + 1,
+		arrayBuffer: async () => new ArrayBuffer(0),
+	};
+	await assert.rejects(parseImportFile(oversized), /larger than 25 MB/);
+});
+
+test('PDF parser caps the number of content streams', async () => {
+	const raw = 'stream\nendstream\n'.repeat(300);
+	await assert.rejects(extractPdfText(new TextEncoder().encode(raw)), /too many content streams/);
 });

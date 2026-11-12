@@ -1,6 +1,13 @@
 // XLSX reader: unzip the OOXML package with DecompressionStream and read the
 // first worksheet into a table. No third-party dependency and no network.
 
+import {
+	MAX_INFLATED_BYTES,
+	MAX_ZIP_ENTRIES,
+	MAX_ZIP_ENTRY_BYTES,
+	readLimitedStream,
+} from './limits.js';
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8');
 
@@ -17,7 +24,7 @@ async function inflateRaw(bytes) {
 		throw new Error('This browser cannot decompress .xlsx files.');
 	}
 	const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-	return new Uint8Array(await new Response(stream).arrayBuffer());
+	return readLimitedStream(stream, MAX_INFLATED_BYTES, 'The ZIP member');
 }
 
 export async function readZip(bytes) {
@@ -32,7 +39,9 @@ export async function readZip(bytes) {
 	}
 	if (eocd < 0) throw new Error('The file is not a ZIP or XLSX package.');
 	const count = readUint16(bytes, eocd + 10);
+	if (count > MAX_ZIP_ENTRIES) throw new Error(`The ZIP package has more than ${MAX_ZIP_ENTRIES} entries.`);
 	let pointer = readUint32(bytes, eocd + 16);
+	let inflatedTotal = 0;
 
 	for (let index = 0; index < count; index += 1) {
 		if (readUint32(bytes, pointer) !== 0x02014b50) break;
@@ -42,16 +51,27 @@ export async function readZip(bytes) {
 		const extraLength = readUint16(bytes, pointer + 30);
 		const commentLength = readUint16(bytes, pointer + 32);
 		const localOffset = readUint32(bytes, pointer + 42);
+		if (compressedSize > MAX_ZIP_ENTRY_BYTES) throw new Error('A ZIP member is too large to import.');
+		if (localOffset + 30 > bytes.length) throw new Error('The ZIP package has a truncated local header.');
 		const name = decoder.decode(bytes.subarray(pointer + 46, pointer + 46 + nameLength));
 		const localNameLength = readUint16(bytes, localOffset + 26);
 		const localExtraLength = readUint16(bytes, localOffset + 28);
 		const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+		if (dataStart + compressedSize > bytes.length) throw new Error('The ZIP package has a truncated member.');
 		const compressed = bytes.subarray(dataStart, dataStart + compressedSize);
-		if (method === 0) {
-			files.set(name, compressed);
-		} else if (method === 8) {
-			files.set(name, await inflateRaw(compressed));
+		let member = compressed;
+		if (method === 8) {
+			member = await inflateRaw(compressed);
+			inflatedTotal += member.byteLength;
+			if (inflatedTotal > MAX_INFLATED_BYTES) {
+				throw new Error(`The ZIP package expands beyond ${Math.round(MAX_INFLATED_BYTES / 1024 / 1024)} MB.`);
+			}
+		} else if (method === 0) {
+			if (compressed.byteLength > MAX_INFLATED_BYTES) throw new Error('A ZIP member is too large to import.');
+		} else {
+			throw new Error('The ZIP package uses an unsupported compression method.');
 		}
+		files.set(name, member);
 		pointer += 46 + nameLength + extraLength + commentLength;
 	}
 	return files;

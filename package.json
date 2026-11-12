@@ -1,6 +1,6 @@
 {
   "name": "renewly",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "Offline-first expense, card, goal, and subscription tracker for Android and the web",
@@ -8,7 +8,14 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run test:unit && npm run security:check",
+    "test:unit": "vitest run",
+    "security:check": "node scripts/security-check.mjs",
+    "security:audit": "npm audit --audit-level=high",
+    "prepare": "husky",
     "serve": "node scripts/serve.mjs public",
     "plans:refresh": "node scripts/refresh-plans.mjs",
     "icons": "node scripts/generate-icons.mjs",
@@ -19,7 +26,10 @@
   "devDependencies": {
     "@capacitor/android": "^8.6.0",
     "@capacitor/cli": "^8.6.0",
-    "@capacitor/core": "^8.6.0"
+    "@capacitor/core": "^8.6.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "husky": "^9.1.7",
+    "vitest": "^5.1.0"
   },
   "dependencies": {
     "@capacitor/filesystem": "^8.1.5",

@@ -1,0 +1,13 @@
+title = "Renewly secret scan"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated and vendored paths"
+paths = [
+  '''node_modules/''',
+  '''coverage/''',
+  '''android/.gradle/''',
+  '''android/app/build/''',
+  '''android/build/''',
+]

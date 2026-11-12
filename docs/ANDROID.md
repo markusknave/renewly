@@ -78,11 +78,31 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 Or copy the APK to the phone, tap it, and allow **Install unknown apps** for the
 file manager.
 
-`android/app/build.gradle` signs both debug and release builds with
-`android/keystore/renewly-beta.p12` (alias `renewly-beta`, password
-`renewly-beta`). That key is committed on purpose so every beta APK upgrades in
-place and keeps the WebView IndexedDB data. It is a beta-only key: do not use it
-for a Play Store release.
+### Signing
+
+Release APKs are signed only on `beta-*` tag builds. The keystore is stored in
+GitHub Actions secrets, never in this repository:
+
+- `RENEWLY_KEYSTORE_BASE64` — base64-encoded PKCS12 keystore.
+- `RENEWLY_STORE_PASSWORD`
+- `RENEWLY_KEY_ALIAS`
+- `RENEWLY_KEY_PASSWORD`
+
+`android/app/build.gradle` reads `RENEWLY_KEYSTORE_FILE` and the three password
+values from the environment. Without them, debug builds use the throwaway
+Android debug key and release builds are unsigned, so pull-request CI never
+produces a release-identity APK.
+
+The beta certificate SHA-256 fingerprint is:
+
+```text
+33:8C:A3:F9:11:95:21:C8:3B:76:A1:75:0D:41:F5:90:E2:A3:7F:EF:6F:81:9A:C8:EC:34:56:88:A5:05:3D:E6
+```
+
+The old beta key that was committed to this repository is retired. It cannot
+update beta-1.2-hotfix or newer installs, but it can still sign updates for
+older installs, so users must do the one-time export/uninstall/install/restore
+migration described in the release notes. Do not reuse it.
 
 ### Home-screen widget
 
@@ -98,8 +118,8 @@ The widget has no background service and stores no data.
   `transactions` and `goals` stores and leaves existing subscriptions, payment
   methods, groups, and settings alone.
 - Android updates an app in place when the package name, version code, and
-  signing key match. Version code 5 and the stable beta key guarantee that for
-  beta-0.3 and newer builds.
+  signing key match. Version code 6 and the new beta key guarantee that for
+  beta-1.2-hotfix and newer builds.
 - Sideloading a package signed by a different key fails with
   `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the only workaround is a one-time
   uninstall, which erases app data. Export JSON first if you hit this with an
@@ -133,10 +153,26 @@ notification while it is open.
 
 ### Option C - Build in the cloud
 
-The included workflow `.github/workflows/android.yml` runs manually
-(`workflow_dispatch`). It installs Node and the Android SDK, runs the tests,
-syncs Capacitor, builds the debug APK, and uploads the `renewly-debug-apk`
-artifact. No repository variables are required.
+`.github/workflows/ci.yml` runs on every pull request and on `main`. It runs
+Vitest with coverage, npm audit, gitleaks, actionlint, Trivy, CodeQL, and
+dependency review. The Android job installs Node, Java, and the Android SDK,
+syncs Capacitor, and builds an unsigned debug APK. It does not receive release
+signing secrets and uploads no APK.
+
+`.github/workflows/release.yml` runs only when a `beta-*` tag is pushed. It
+repeats the tests and security gates, decodes `RENEWLY_KEYSTORE_BASE64` into
+`$RUNNER_TEMP`, builds `assembleRelease` with the secret-backed key, verifies the
+certificate with `apksigner`, writes a SHA-256 checksum, and publishes the APK
+to the GitHub release.
+
+Required repository secrets:
+
+```text
+RENEWLY_KEYSTORE_BASE64
+RENEWLY_STORE_PASSWORD
+RENEWLY_KEY_ALIAS
+RENEWLY_KEY_PASSWORD
+```
 
 ## Phone and tablet sizing
 
@@ -169,7 +205,7 @@ npm run icons
 | Old UI after an update | Fully close the app; bump `CACHE_NAME` in `public/sw.js`; rebuild the APK. |
 | Catalog is empty | Confirm `public/data/plans.json` exists and was copied by `android:sync`. |
 | Data disappeared | App storage was cleared or the APK was uninstalled. Restore from an exported JSON file. |
-| Install says signature mismatch | The old APK used a different key. Export data, uninstall once, install beta-1.2, then import the JSON file. |
+| Install says signature mismatch | The old APK used the retired key. Export data, uninstall once, install beta-1.2-hotfix, then import the JSON file. |
 | No notification when closed | Grant notification/alarm permission in Android settings and allow Renewly to run without battery restrictions. |
 | Build fails with missing SDK | Install Android SDK Platform 36 and Build-Tools in Android Studio. |
 | PWA install option missing | The page is not HTTPS or `localhost`. Use the APK or an HTTPS host. |
