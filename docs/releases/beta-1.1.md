@@ -11,7 +11,7 @@ Excel / PDF reports, and a strictly offline analyst.
   category, method, or search text.
 - **Card dashboard** — stylised Philippine card designs for BPI, BDO, Metrobank,
   UnionBank, RCBC, Security Bank, Chinabank, LANDBANK, PNB, CIMB, Maya, GCash,
-  SeaBank, GoTyme, Tonik, MariBank, Netbank, UNO, UnionDigital, Komo,
+  GoTyme, Tonik, MariBank, Netbank, UNO, UnionDigital, Komo,
   DiskarTech, GrabPay, ShopeePay, PayPal, Wise, American Express, Citi, HSBC,
   Standard Chartered, and Maybank, plus clean fallbacks for other accounts. Each
   card records whether it is debit, credit, prepaid, an account, a wallet, or

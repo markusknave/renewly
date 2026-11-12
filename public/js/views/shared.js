@@ -118,6 +118,18 @@ export function methodProviderField(kind, label) {
 	</label>`;
 }
 
+export function breadcrumb(items) {
+	return `<nav class="breadcrumb" aria-label="Breadcrumb">${(items || [])
+		.map((item, index) => {
+			const label = esc(item.label);
+			const node = item.href
+				? `<a href="${esc(item.href)}">${label}</a>`
+				: `<span aria-current="page">${label}</span>`;
+			return `${index ? '<span class="breadcrumb-sep" aria-hidden="true">/</span>' : ''}${node}`;
+		})
+		.join('')}</nav>`;
+}
+
 export function avatar(name) {
 	const letter = String(name || '?').trim().charAt(0).toUpperCase() || '?';
 	return `<span class="avatar" aria-hidden="true">${esc(letter)}</span>`;

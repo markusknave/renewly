@@ -1,0 +1,216 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
+import { parseImportFile, importRows, recategorizeRows, analyzeRows } from '../public/js/import.js';
+import { parseCsv } from '../public/js/importers/csv.js';
+import { readXlsx } from '../public/js/importers/xlsx.js';
+import { extractPdfText } from '../public/js/importers/pdf.js';
+import { readMmbak } from '../public/js/importers/sqlite.js';
+import { rowsToTransactions, linesToTransactions, parseAnyDate, parseMoney } from '../public/js/importers/table.js';
+import { buildReport, toPdf, toXlsx } from '../public/js/export.js';
+import { createMemoryBackend } from '../public/js/db.js';
+import { listTransactions, savePaymentMethod } from '../public/js/store.js';
+
+const methods = [
+	{ id: 1, label: 'BPI Debit' },
+	{ id: 2, label: 'Maya' },
+];
+
+function fileLike(name, bytes, type = '') {
+	const buffer = bytes instanceof Uint8Array ? bytes : new TextEncoder().encode(bytes);
+	return {
+		name,
+		type,
+		arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+	};
+}
+
+function sampleReport() {
+	return buildReport({
+		methods,
+		goals: [],
+		from: '2026-11-01',
+		to: '2026-11-30',
+		today: '2026-11-12',
+		transactions: [
+			{ id: 1, type: 'expense', date: '2026-11-01', amountCents: 12_550, paymentMethodId: 1, category: 'food', merchant: 'Jollibee' },
+			{ id: 2, type: 'expense', date: '2026-11-02', amountCents: 89_900, paymentMethodId: 2, category: 'shopping', merchant: 'Uniqlo' },
+		],
+	});
+}
+
+test('CSV parser handles quotes, delimiters, and CRLF', () => {
+	const rows = parseCsv('Date,Description,Amount\r\n2026-11-01,"Jollibee, SM",-125.50\r\n2026-11-02,Uniqlo,899.00\r\n');
+	assert.deepEqual(rows[0], ['Date', 'Description', 'Amount']);
+	assert.deepEqual(rows[1], ['2026-11-01', 'Jollibee, SM', '-125.50']);
+	assert.deepEqual(rows[2], ['2026-11-02', 'Uniqlo', '899.00']);
+
+	const semicolon = parseCsv('Date;Description;Amount\n2026-11-01;Lunch;125.00\n');
+	assert.equal(semicolon[1][1], 'Lunch');
+});
+
+test('table mapping infers categories, methods, and skips credits', () => {
+	const rows = [
+		['Date', 'Description', 'Amount', 'Category', 'Account'],
+		['2026-11-01', 'Jollibee, SM', '-125.50', 'Food', 'BPI Debit'],
+		['2026-11-02', 'Uniqlo', '899.00', 'Shopping', 'Maya'],
+		['2026-11-03', 'Salary', '50000.00', 'Income', 'Maya'],
+	];
+	const result = rowsToTransactions(rows, { methods, defaultMethodId: 1 });
+	assert.equal(result.stats.valid, 2);
+	assert.equal(result.stats.creditsSkipped, 1);
+	assert.equal(result.rows[0].category, 'food');
+	assert.equal(result.rows[0].paymentMethodId, 1);
+	assert.equal(result.rows[1].category, 'shopping');
+	assert.equal(result.rows[1].paymentMethodId, 2);
+});
+
+test('debit/credit columns are handled separately', () => {
+	const rows = [
+		['Date', 'Description', 'Debit', 'Credit', 'Account'],
+		['2026-11-01', 'Lunch', '125.00', '', 'BPI Debit'],
+		['2026-11-02', 'Refund', '', '50.00', 'BPI Debit'],
+	];
+	const result = rowsToTransactions(rows, { methods });
+	assert.equal(result.rows.length, 1);
+	assert.equal(result.rows[0].amountCents, 12_500);
+	assert.equal(result.stats.creditsSkipped, 1);
+});
+
+test('date and money parsing cover local, epoch, Excel, and currency formats', () => {
+	assert.equal(parseAnyDate('2026-11-12'), '2026-11-12');
+	assert.equal(parseAnyDate('11/12/2026'), '2026-11-12');
+	assert.equal(parseAnyDate('Nov 12, 2026'), '2026-11-12');
+	assert.equal(parseAnyDate(1_762_000_000), '2025-11-01');
+	assert.equal(parseAnyDate(45_000), '2023-03-15');
+	assert.equal(parseMoney('₱1,234.56'), 123_456);
+	assert.equal(parseMoney('(1,234.56)'), 123_456);
+	assert.equal(parseMoney(1234.56), 123_456);
+});
+
+test('XLSX writer output reads back as a table and maps to expenses', async () => {
+	const bytes = await toXlsx(sampleReport());
+	const table = await readXlsx(bytes);
+	assert.equal(table[0][0], 'Date');
+	const result = rowsToTransactions(table, { methods, defaultMethodId: 1 });
+	assert.equal(result.stats.valid, 2);
+	assert.deepEqual(result.rows.map((row) => row.amountCents), [89_900, 12_550]);
+	assert.equal(result.rows[0].paymentMethodId, 2);
+});
+
+test('PDF writer output extracts text lines and maps to expenses', async () => {
+	const bytes = toPdf(sampleReport());
+	const lines = await extractPdfText(bytes);
+	assert.ok(lines.some((line) => line.includes('Uniqlo')));
+	const result = linesToTransactions(lines, { methods, defaultMethodId: 1 });
+	assert.equal(result.stats.valid, 2);
+	assert.deepEqual(result.rows.map((row) => row.amountCents), [89_900, 12_550]);
+	assert.equal(result.rows[0].merchant, 'Uniqlo');
+	assert.equal(result.rows[1].merchant, 'Jollibee');
+});
+
+test('MMBAK reads ZIP or plain SQLite Money Manager rows', async () => {
+	const directory = mkdtempSync(join(tmpdir(), 'renewly-mmbak-'));
+	const path = join(directory, 'backup.mmbak');
+	const db = new DatabaseSync(path);
+	db.exec(`
+		CREATE TABLE ZINOUTCOME (uid INTEGER PRIMARY KEY, ZMONEY REAL, WDATE INTEGER, DO_TYPE INTEGER, ZCATEGORY INTEGER, ZASSET INTEGER, ZCONTENT TEXT, IS_DEL INTEGER);
+		CREATE TABLE ZCATEGORY (uid INTEGER PRIMARY KEY, ZNAME TEXT);
+		CREATE TABLE ZASSETS (uid INTEGER PRIMARY KEY, NIC_NAME TEXT);
+		INSERT INTO ZCATEGORY (uid, ZNAME) VALUES (10, 'Food & Drinks'), (11, 'Shopping');
+		INSERT INTO ZASSETS (uid, NIC_NAME) VALUES (20, 'BPI Debit'), (21, 'Maya');
+		INSERT INTO ZINOUTCOME (ZMONEY, WDATE, DO_TYPE, ZCATEGORY, ZASSET, ZCONTENT, IS_DEL) VALUES
+			(125.50, 1761955200, 1, 10, 20, 'Jollibee lunch', 0),
+			(899.00, 1762041600, 1, 11, 21, 'Uniqlo shirt', 0),
+			(50000.00, 1762128000, 0, 11, 21, 'Salary', 0),
+			(999.00, 1762214400, 1, 10, 20, 'Deleted', 1);
+	`);
+	db.close();
+	try {
+		const bytes = readFileSync(path);
+		const result = await readMmbak(bytes, { methods, defaultMethodId: 1 });
+		assert.equal(result.rows.length, 2);
+		assert.equal(result.stats.creditsSkipped, 1);
+		assert.equal(result.rows[0].category, 'food');
+		assert.equal(result.rows[0].paymentMethodId, 1);
+		assert.equal(result.rows[1].paymentMethodId, 2);
+		assert.equal(result.rows[1].merchant, 'Uniqlo shirt');
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
+
+test('JSON import handles Renewly backups and generic arrays', async () => {
+	const backup = {
+		app: 'renewly',
+		version: 4,
+		transactions: [
+			{ type: 'expense', date: '2026-11-01', amountCents: 12_550, merchant: 'Jollibee', category: 'food', paymentMethodId: 1, notes: '' },
+			{ type: 'interest', date: '2026-11-02', amountCents: 100, merchant: 'Interest', paymentMethodId: 1 },
+		],
+		paymentMethods: [{ id: 1, label: 'BPI Debit' }],
+	};
+	const preview = await parseImportFile(fileLike('backup.json', JSON.stringify(backup), 'application/json'), { methods, defaultMethodId: 1 });
+	assert.equal(preview.format, 'JSON');
+	assert.equal(preview.rows.length, 1);
+	assert.equal(preview.rows[0].amountCents, 12_550);
+
+	const generic = await parseImportFile(
+		fileLike('expenses.json', JSON.stringify([{ date: '2026-11-03', description: 'Grab ride', amount: 250, account: 'Maya' }]), 'application/json'),
+		{ methods, defaultMethodId: 1 }
+	);
+	assert.equal(generic.rows.length, 1);
+	assert.equal(generic.rows[0].category, 'transport');
+	assert.equal(generic.rows[0].paymentMethodId, 2);
+});
+
+test('parseImportFile detects CSV, XLSX, and PDF files', async () => {
+	const csv = await parseImportFile(
+		fileLike('statement.csv', 'Date,Description,Amount,Account\n2026-11-01,Jollibee,125.50,BPI Debit\n', 'text/csv'),
+		{ methods, defaultMethodId: 1 }
+	);
+	assert.equal(csv.format, 'CSV');
+	assert.equal(csv.rows.length, 1);
+
+	const xlsx = await parseImportFile(fileLike('statement.xlsx', await toXlsx(sampleReport())), { methods, defaultMethodId: 1 });
+	assert.equal(xlsx.format, 'Excel');
+	assert.equal(xlsx.rows.length, 2);
+
+	const pdf = await parseImportFile(fileLike('statement.pdf', toPdf(sampleReport()), 'application/pdf'), { methods, defaultMethodId: 1 });
+	assert.equal(pdf.format, 'PDF');
+	assert.equal(pdf.rows.length, 2);
+});
+
+test('importRows commits expenses and skips duplicates', async () => {
+	const db = createMemoryBackend();
+	const account = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card', openingBalanceCents: 100_000 });
+	const rows = [
+		{ date: '2026-11-01', merchant: 'Jollibee', amountCents: 12_550, category: 'food', notes: '', paymentMethodId: account.id },
+		{ date: '2026-11-01', merchant: 'Jollibee', amountCents: 12_550, category: 'food', notes: '', paymentMethodId: account.id },
+	];
+	const first = await importRows(db, rows, { existing: [] });
+	assert.deepEqual(first, { imported: 1, skipped: 1, failed: 0 });
+	const second = await importRows(db, rows, { existing: await listTransactions(db) });
+	assert.deepEqual(second, { imported: 0, skipped: 2, failed: 0 });
+	const transactions = await listTransactions(db);
+	assert.equal(transactions.length, 1);
+	assert.equal(transactions[0].type, 'expense');
+});
+
+test('analyst helpers recategorize and summarize imported rows', () => {
+	const rows = [
+		{ date: '2026-11-01', merchant: 'Grab ride', amountCents: 25_000, category: 'other', notes: '', paymentMethodId: 1 },
+		{ date: '2026-11-02', merchant: 'Meralco bill', amountCents: 150_000, category: 'other', notes: '', paymentMethodId: 1 },
+	];
+	const recategorized = recategorizeRows(rows);
+	assert.equal(recategorized[0].category, 'transport');
+	assert.equal(recategorized[1].category, 'bills');
+	const analysis = analyzeRows(recategorized);
+	assert.equal(analysis.count, 2);
+	assert.equal(analysis.totalCents, 175_000);
+	assert.equal(analysis.categories[0].key, 'bills');
+});

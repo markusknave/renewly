@@ -6,12 +6,24 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-1.1](https://github.com/markusknave/renewly/releases/tag/beta-1.1), and its
+[beta-1.2](https://github.com/markusknave/renewly/releases/tag/beta-1.2), and its
 release asset is the installable APK:
 
 ```text
-renewly-beta-1.1.apk
+renewly-beta-1.2.apk
 ```
+
+## What is new in beta-1.2
+
+- **Statement import.** Read CSV, text PDF, Excel (.xlsx), JSON, and Realbyte
+  Money Manager `.mbak`/`.mmbak` backups. Preview every row, see the local
+  analyst's category summary, skip duplicates, and commit the expenses.
+- **Breadcrumbs.** Every module under **More** now shows `More / Module` and a
+  link back to the hub.
+- **Android home-screen widget.** A 2×1 Renewly widget opens the expense tracker
+  and the add-expense dialog directly from the launcher.
+- **Current bank name.** SeaBank Philippines is now MariBank, so the provider
+  list and card theme use MariBank.
 
 ## What is new in beta-1.1
 
@@ -52,15 +64,33 @@ renewly-beta-1.1.apk
   time, or a custom range. Category, method, and text filters apply on top.
 - Delete an expense to restore the amount to its payment method.
 
+### Importing statements
+
+- Supported files: CSV/TSV, text-based PDF, Excel `.xlsx`, JSON, and Realbyte
+  Money Manager `.mbak`/`.mmbak` (ZIP-wrapped or plain SQLite).
+- Open **Expenses → Import** or **More → Import expenses**. Choose or drop a
+  file, review the parsed rows, then import.
+- The local analyst infers categories from the description and notes, and
+  matches account/card names to your saved payment methods. Rows without a
+  match use the default method you choose.
+- Debit and withdrawal rows become expenses. Credit, deposit, and income rows
+  are skipped because this import is expense-focused.
+- Duplicate rows (same date, amount, normalized merchant, and method) are marked
+  and excluded. The commit step rechecks against the current ledger.
+- Legacy `.xls` files are not supported; save them as `.xlsx` or CSV. Scanned
+  image PDFs need OCR before import because there is no text layer to read.
+- The import is local: the file is read in the browser/WebView and nothing is
+  uploaded.
+
 ### Cards and interest
 
 - Cards, e-wallets, bank accounts, cash, and other accounts.
 - Stylised card art for BPI, BDO, Metrobank, UnionBank, RCBC, Security Bank,
-  Chinabank, LANDBANK, PNB, CIMB, Maya, GCash, SeaBank, GoTyme, Tonik, MariBank,
+  Chinabank, LANDBANK, PNB, CIMB, Maya, GCash, GoTyme, Tonik, MariBank,
   Netbank, UNO, UnionDigital, Komo, DiskarTech, GrabPay, ShopeePay, PayPal, Wise,
   American Express, Citi, HSBC, Standard Chartered, and Maybank. Other providers
-  use a clean fallback based on account type. The artwork is original CSS
-  inspired by public brand colours, not official bank assets.
+  use a clean fallback based on account type. SeaBank Philippines was renamed
+  MariBank in 2025, so the app uses the current name.
 - Set the instrument (debit, credit, prepaid, account, wallet, or cash), the
   network, the annual rate in percent (for example `3.25`), and daily or monthly
   compounding.
@@ -124,12 +154,18 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-1.1.apk
+adb install -r renewly-beta-1.2.apk
 ```
+
+### Updating from beta-1.1
+
+Installing beta-1.2 over beta-1.1 keeps the IndexedDB database. There is no
+schema change; the import feature only adds rows through the existing expense
+store. Both APKs use the same beta key, so the update installs in place.
 
 ### Updating from beta-0.3
 
-Installing beta-1.1 over beta-0.3 keeps the IndexedDB database. The schema moves
+Installing beta-1.2 over beta-0.3 keeps the IndexedDB database. The schema moves
 from version 2 to version 3, which only adds the `transactions` and `goals`
 stores; existing subscriptions, groups, payment methods, and settings are left
 alone. Both APKs use the same beta key, so the update installs in place.
@@ -139,7 +175,7 @@ alone. Both APKs use the same beta key, so the update installs in place.
 Every beta-0.2 and newer APK is signed with the same bundled beta key, so future
 updates install in place. beta-0.1 CI builds used a runner-generated debug key.
 If Android rejects the install with a signature mismatch, export your data
-first, uninstall beta-0.1 once, then install beta-1.1 and import the JSON backup.
+first, uninstall beta-0.1 once, then install beta-1.2 and import the JSON backup.
 
 ## Run it locally
 
@@ -161,6 +197,13 @@ install, use the APK above or serve `public/` over HTTPS.
 
 The native project lives in `android/`. Capacitor copies `public/` into the app,
 so the APK runs with no network and no configured server URL.
+
+### Home-screen widget
+
+Long-press the Android home screen, choose **Widgets → Renewly**, and place the
+2×1 quick-add widget. Tapping it opens Renewly on the expense tracker and opens
+the add-expense dialog. The widget is a native `AppWidgetProvider`; it does not
+run a background service or collect data.
 
 ```bash
 npm ci
@@ -245,6 +288,14 @@ npm run plans:refresh -- --write     # record fetched fingerprints
   closed-app reminders.
 - Catalog prices are point-in-time snapshots and vary by region, plan, and
   promotions. Always confirm on the platform before paying.
+- Import supports text-based PDFs only. Scanned image statements need OCR
+  first. Legacy `.xls` files must be saved as `.xlsx` or CSV. `.mbak`/`.mmbak`
+  files must be Realbyte Money Manager backups with a readable `ZINOUTCOME`
+  table.
+- Imported expenses are only as accurate as the statement's text and the
+  account matching. Review the preview before committing; duplicate detection
+  uses date, amount, merchant, and method and cannot catch every reworded
+  merchant.
 - The web app needs a modern browser with IndexedDB and, for Excel export,
   `CompressionStream`; without it the workbook is written uncompressed and still
   opens.
@@ -261,14 +312,16 @@ public/
   js/store.js            validation, CRUD, groups, settings, subscriptions
   js/finance.js          balances, interest accrual, goals, periods
   js/insights.js         local analyst, forecasts, offline chat
+  js/import.js           import orchestrator, JSON mapping, duplicate-safe commit
+  js/importers/          CSV, XLSX, PDF text, and MMBAK/SQLite readers
   js/export.js           CSV, XLSX, and PDF writers
   js/backup.js           JSON backup build/validate/apply (v4)
   js/catalog.js          bundled catalog loader
   js/reminders.js        reminder occurrence computation
   js/notifications.js    Capacitor local-notification bridge
   js/views.js            view barrel
-  js/views/              dashboard, expenses, goals, insights, cards, more,
-                         subscriptions, shared helpers
+  js/views/              dashboard, expenses, goals, insights, import, cards,
+                         more, subscriptions, shared helpers
   js/lib/dates.js        date, money, and cadence helpers
   js/lib/providers.js    Philippine banks and e-wallets per payment type
   js/lib/categories.js   expense categories, colors, icons, keywords
@@ -282,6 +335,6 @@ scripts/
   refresh-plans.mjs      catalog refresh/drift report
   plans.sources.json     catalog sources
   generate-icons.mjs     icon generator
-android/                 Capacitor Android project
+android/                 Capacitor Android project (includes QuickAddWidget)
 test/                    node:test suites
 ```

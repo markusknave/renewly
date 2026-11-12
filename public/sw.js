@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renewly-shell-v6';
+const CACHE_NAME = 'renewly-shell-v7';
 const APP_ASSETS = [
 	'./',
 	'./index.html',
@@ -10,6 +10,7 @@ const APP_ASSETS = [
 	'./js/views/expenses.js',
 	'./js/views/goals.js',
 	'./js/views/insights.js',
+	'./js/views/import.js',
 	'./js/views/money.js',
 	'./js/views/more.js',
 	'./js/views/subscriptions.js',
@@ -17,7 +18,13 @@ const APP_ASSETS = [
 	'./js/db.js',
 	'./js/finance.js',
 	'./js/insights.js',
+	'./js/import.js',
 	'./js/export.js',
+	'./js/importers/table.js',
+	'./js/importers/csv.js',
+	'./js/importers/xlsx.js',
+	'./js/importers/pdf.js',
+	'./js/importers/sqlite.js',
 	'./js/catalog.js',
 	'./js/backup.js',
 	'./js/notifications.js',

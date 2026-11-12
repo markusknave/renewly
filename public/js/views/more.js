@@ -56,6 +56,12 @@ export function moreView({ methods = [], goals = [], subscriptions = [], transac
 			meta: `${transactions.filter((transaction) => transaction.type === 'expense').length}`,
 		})}
 		${tile({
+			href: '#/import',
+			iconName: 'download',
+			title: 'Import expenses',
+			body: 'Read CSV, PDF, Excel, JSON, or Money Manager backups.',
+		})}
+		${tile({
 			href: '#/catalog',
 			iconName: 'grid',
 			title: 'Plan catalog',
@@ -75,8 +81,8 @@ export function moreView({ methods = [], goals = [], subscriptions = [], transac
 		})}
 	</section>
 	<section class="panel panel-muted">
-		<div class="panel-head"><h2>About this build</h2><span class="pill">beta-1.1</span></div>
+		<div class="panel-head"><h2>About this build</h2><span class="pill">beta-1.2</span></div>
 		<p class="muted small">Renewly is a local-only money tracker. Balances are derived from the starting balance you enter plus the transactions you log and the interest the app accrues. It is not connected to any bank; figures are only as accurate as your entries.</p>
-		<p class="muted small">Interest uses the annual rate you enter (gross of the 20% final tax). Card artwork is an original CSS recreation inspired by each issuer's public colours, not official bank artwork.</p>
+		<p class="muted small">Interest uses the annual rate you enter (gross of the 20% final tax).</p>
 	</section>`;
 }

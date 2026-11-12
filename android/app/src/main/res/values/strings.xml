@@ -4,4 +4,7 @@
     <string name="title_activity_main">Renewly</string>
     <string name="package_name">com.renewly.app</string>
     <string name="custom_url_scheme">com.renewly.app</string>
+    <string name="widget_title">Renewly</string>
+    <string name="widget_action">Add an expense</string>
+    <string name="widget_description">Open Renewly and add an expense</string>
 </resources>
