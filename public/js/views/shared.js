@@ -206,7 +206,7 @@ export function subscriptionRows(subscriptions, methods, today, groups = []) {
 
 export function bankCard(method, snapshot, { compact = false, showBalance = true } = {}) {
 	const theme = cardThemeFor(method.label, method.kind, method.network);
-	const instrument = instrumentFor(method.kind);
+	const instrument = method.instrument || instrumentFor(method.kind);
 	const total = snapshot?.totalCents ?? 0;
 	const pending = snapshot?.pendingCents ?? 0;
 	return `<article class="bank-card${compact ? ' bank-card-compact' : ''}" style="--card-a:${theme.c1};--card-b:${theme.c2};--card-ink:${theme.ink};--card-accent:${theme.accent}">

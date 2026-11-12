@@ -61,8 +61,9 @@ renewly-beta-1.1.apk
   American Express, Citi, HSBC, Standard Chartered, and Maybank. Other providers
   use a clean fallback based on account type. The artwork is original CSS
   inspired by public brand colours, not official bank assets.
-- Set the annual rate in percent (for example `3.25`), the network, and daily or
-  monthly compounding.
+- Set the instrument (debit, credit, prepaid, account, wallet, or cash), the
+  network, the annual rate in percent (for example `3.25`), and daily or monthly
+  compounding.
 - Interest is gross of the 20% final tax on Philippine deposit interest. Renewly
   does not deduct tax automatically.
 - Daily compounding: `balance × rate ÷ 365` each day, rounded to cents, added to

@@ -170,6 +170,8 @@ test('payment method screen exposes balances, rates, compounding, and network', 
 	assert.match(html, /name="openingDate"/);
 	assert.match(html, /name="interestRate"/);
 	assert.match(html, /name="interestFrequency"/);
+	assert.match(html, /name="instrument"/);
+	assert.match(html, /<option value="debit" selected>Debit<\/option>/);
 	assert.match(html, /name="network"/);
 	assert.match(html, /MariBank/);
 	assert.match(html, /3\.25% p\.a\./);

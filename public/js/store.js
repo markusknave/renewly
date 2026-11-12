@@ -1,4 +1,5 @@
 import { CATEGORY_KEYS } from './lib/categories.js';
+import { INSTRUMENTS, instrumentFor } from './lib/cardThemes.js';
 import {
 	INTEREST_FREQUENCIES,
 	TRANSACTION_TYPES,
@@ -428,6 +429,10 @@ function validatePaymentMethodInput(input) {
 
   const network = ['visa', 'mastercard', 'other'].includes(source.network) ? source.network : '';
 
+  const instrument = INSTRUMENTS.includes(source.instrument)
+    ? source.instrument
+    : instrumentFor(kind);
+
   const id = normalizeId(source.id, errors);
 
   const data = {
@@ -440,6 +445,7 @@ function validatePaymentMethodInput(input) {
     interestRateBps,
     interestFrequency,
     network,
+    instrument,
   };
   if (id) data.id = id;
 

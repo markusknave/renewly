@@ -15,6 +15,7 @@ import {
 	saveSettings,
 } from './store.js';
 import { CATEGORY_KEYS } from './lib/categories.js';
+import { INSTRUMENTS } from './lib/cardThemes.js';
 import { INTEREST_FREQUENCIES, TRANSACTION_TYPES } from './finance.js';
 
 export const EXPORT_APP = 'renewly';
@@ -109,6 +110,7 @@ export function buildExport(
 				? method.interestFrequency
 				: 'none',
 			network: NETWORKS.includes(method.network) ? method.network : '',
+			instrument: INSTRUMENTS.includes(method.instrument) ? method.instrument : '',
 			createdAt: method.createdAt ?? null,
 		})),
 		goals: (goals || []).map((goal) => ({
@@ -236,6 +238,7 @@ export function normalizeBackup(parsed) {
 				? method.interestFrequency
 				: 'none',
 			network: NETWORKS.includes(method.network) ? method.network : '',
+			instrument: INSTRUMENTS.includes(method.instrument) ? method.instrument : '',
 			createdAt: method.createdAt ?? null,
 		}));
 
@@ -338,6 +341,7 @@ export async function applyBackup(db, backup, now = new Date()) {
 			interestRateBps: method.interestRateBps,
 			interestFrequency: method.interestFrequency,
 			network: method.network,
+			instrument: method.instrument,
 			createdAt: method.createdAt || stamp,
 			updatedAt: stamp,
 		});

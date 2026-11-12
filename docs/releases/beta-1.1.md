@@ -13,7 +13,9 @@ Excel / PDF reports, and a strictly offline analyst.
   UnionBank, RCBC, Security Bank, Chinabank, LANDBANK, PNB, CIMB, Maya, GCash,
   SeaBank, GoTyme, Tonik, MariBank, Netbank, UNO, UnionDigital, Komo,
   DiskarTech, GrabPay, ShopeePay, PayPal, Wise, American Express, Citi, HSBC,
-  Standard Chartered, and Maybank, plus clean fallbacks for other accounts.
+  Standard Chartered, and Maybank, plus clean fallbacks for other accounts. Each
+  card records whether it is debit, credit, prepaid, an account, a wallet, or
+  cash.
 - **Interest that compounds** — enter an annual rate and choose daily or monthly
   compounding. Completed months post one automatic `Interest earned` row; the
   current month shows as pending interest on the card and is included in the

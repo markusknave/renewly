@@ -222,6 +222,7 @@ test('version 4 backups round-trip ledger entries, goals, and card interest sett
 	const parsed = JSON.parse(text);
 	assert.equal(parsed.version, 4);
 	assert.equal(parsed.paymentMethods[0].interestRateBps, 325);
+	assert.equal(parsed.paymentMethods[0].instrument, 'debit');
 	assert.equal(parsed.goals[0].name, 'Japan trip');
 	assert.equal(parsed.transactions.length, 2);
 
@@ -234,6 +235,7 @@ test('version 4 backups round-trip ledger entries, goals, and card interest sett
 	assert.equal(importedMethod.interestRateBps, 325);
 	assert.equal(importedMethod.interestFrequency, 'daily');
 	assert.equal(importedMethod.openingBalanceCents, 5_000_000);
+	assert.equal(importedMethod.instrument, 'debit');
 
 	const [importedGoal] = await listGoals(target);
 	assert.equal(importedGoal.color, 'teal');

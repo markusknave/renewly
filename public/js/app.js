@@ -446,6 +446,7 @@ function methodInput(form) {
 		kind: String(fd.get('kind') || 'other'),
 		last4: String(fd.get('last4') || '').replace(/\D/g, '').slice(0, 4),
 		network: String(fd.get('network') || ''),
+		instrument: String(fd.get('instrument') || ''),
 		openingBalanceCents: parseNumericAmount(fd.get('openingBalance')) ?? 0,
 		openingDate: String(fd.get('openingDate') || '') || null,
 		interestRateBps: Number.isFinite(rate) ? rate : 0,

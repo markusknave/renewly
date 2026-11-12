@@ -4,6 +4,8 @@ import { INTEREST_FREQUENCY_LABELS } from '../finance.js';
 import {
 	CARD_NETWORKS,
 	CARD_NETWORK_LABELS,
+	INSTRUMENTS,
+	INSTRUMENT_LABELS,
 	cardThemeFor,
 	instrumentFor,
 	instrumentLabel,
@@ -38,6 +40,11 @@ function methodFields(method) {
 			PAYMENT_KIND_LABELS
 		)}</select></label>
 		${methodProviderField(kind, method.label || '')}
+		<label>Instrument<select name="instrument">${options(
+			INSTRUMENTS,
+			instrumentFor(kind, method.instrument),
+			INSTRUMENT_LABELS
+		)}</select></label>
 		<label>Last 4<input type="text" name="last4" inputmode="numeric" maxlength="4" value="${esc(
 			method.last4 || ''
 		)}" placeholder="1234" /></label>
@@ -72,7 +79,7 @@ export function cardsView({ methods = [], snapshots = [], today }) {
 				${bankCard(method, snapshotFor(method.id))}
 				<div class="method-meta">
 					<span class="pill">${esc(PAYMENT_KIND_LABELS[method.kind] || method.kind)}</span>
-					<span class="pill">${esc(instrumentLabel(instrumentFor(method.kind)))}</span>
+					<span class="pill">${esc(instrumentLabel(method.instrument || instrumentFor(method.kind)))}</span>
 					${
 						method.interestFrequency && method.interestFrequency !== 'none'
 							? `<span class="pill pill-interest">${esc(
