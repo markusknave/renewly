@@ -90,6 +90,10 @@ test('export/import round-trips groups, methods, owners, and settings', async ()
 		currency: 'PHP',
 		timezone: 'Asia/Tokyo',
 		reminderDays: [1, 5],
+		theme: 'ivory',
+		font: 'poppins',
+		customAccent: '#6d4aff',
+		customBackground: '#f7f3ec',
 	});
 });
 

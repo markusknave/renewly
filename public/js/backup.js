@@ -16,6 +16,7 @@ import {
 } from './store.js';
 import { CATEGORY_KEYS, INCOME_CATEGORY } from './lib/categories.js';
 import { INSTRUMENTS } from './lib/cardThemes.js';
+import { DEFAULT_APPEARANCE, FONT_IDS, THEME_IDS, normalizeHex } from './lib/themes.js';
 import { INTEREST_FREQUENCIES, TRANSACTION_TYPES } from './finance.js';
 
 export const EXPORT_APP = 'renewly';
@@ -91,6 +92,10 @@ export function buildExport(
 			reminderDays: Array.isArray(settings?.reminderDays)
 				? settings.reminderDays
 				: DEFAULT_SETTINGS.reminderDays,
+			theme: THEME_IDS.includes(settings?.theme) ? settings.theme : DEFAULT_APPEARANCE.theme,
+			font: FONT_IDS.includes(settings?.font) ? settings.font : DEFAULT_APPEARANCE.font,
+			customAccent: normalizeHex(settings?.customAccent, DEFAULT_APPEARANCE.customAccent),
+			customBackground: normalizeHex(settings?.customBackground, DEFAULT_APPEARANCE.customBackground),
 		},
 		groups: (groups || []).map((group) => ({
 			id: group.id,
@@ -214,6 +219,10 @@ export function normalizeBackup(parsed) {
 		currency: 'PHP',
 		timezone: validTimezone(timezone) ? timezone : DEFAULT_SETTINGS.timezone,
 		reminderDays: reminderDays.length ? reminderDays : [...DEFAULT_SETTINGS.reminderDays],
+		theme: THEME_IDS.includes(settingsSource.theme) ? settingsSource.theme : DEFAULT_APPEARANCE.theme,
+		font: FONT_IDS.includes(settingsSource.font) ? settingsSource.font : DEFAULT_APPEARANCE.font,
+		customAccent: normalizeHex(settingsSource.customAccent, DEFAULT_APPEARANCE.customAccent),
+		customBackground: normalizeHex(settingsSource.customBackground, DEFAULT_APPEARANCE.customBackground),
 	};
 
 	const groups = (Array.isArray(source.groups) ? source.groups : [])

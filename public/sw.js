@@ -1,8 +1,26 @@
-const CACHE_NAME = 'renewly-shell-v11';
+const CACHE_NAME = 'renewly-shell-v12';
+const FONT_ASSETS = [
+	'./fonts/poppins-400.woff2',
+	'./fonts/poppins-500.woff2',
+	'./fonts/poppins-600.woff2',
+	'./fonts/poppins-700.woff2',
+	'./fonts/inter-400700.woff2',
+	'./fonts/roboto-400700.woff2',
+	'./fonts/open-sans-400700.woff2',
+	'./fonts/montserrat-400700.woff2',
+	'./fonts/lato-400.woff2',
+	'./fonts/lato-700.woff2',
+	'./fonts/nunito-sans-400700.woff2',
+	'./fonts/dm-sans-400700.woff2',
+	'./fonts/work-sans-400700.woff2',
+	'./fonts/manrope-400700.woff2',
+];
 const APP_ASSETS = [
 	'./',
 	'./index.html',
 	'./styles.css',
+	'./fonts/fonts.css',
+	...FONT_ASSETS,
 	'./js/app.js',
 	'./js/views.js',
 	'./js/views/shared.js',
@@ -13,6 +31,7 @@ const APP_ASSETS = [
 	'./js/views/import.js',
 	'./js/views/money.js',
 	'./js/views/more.js',
+	'./js/views/appearance.js',
 	'./js/views/subscriptions.js',
 	'./js/store.js',
 	'./js/db.js',
@@ -38,6 +57,7 @@ const APP_ASSETS = [
 	'./js/lib/categories.js',
 	'./js/lib/cardThemes.js',
 	'./js/lib/combobox.js',
+	'./js/lib/themes.js',
 	'./vendor/tesseract/tesseract.min.js',
 	'./vendor/tesseract/worker.min.js',
 	'./vendor/tesseract/tesseract-core-lstm.wasm.js',

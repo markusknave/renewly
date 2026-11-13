@@ -219,7 +219,7 @@ export function subscriptionRows(subscriptions, methods, today, groups = []) {
 }
 
 export function bankCard(method, snapshot, { compact = false, showBalance = true } = {}) {
-	const theme = cardThemeFor(method.label, method.kind, method.network);
+	const theme = cardThemeFor(method.label, method.kind, method.network, method.instrument);
 	const instrument = method.instrument || instrumentFor(method.kind);
 	const total = snapshot?.totalCents ?? 0;
 	const pending = snapshot?.pendingCents ?? 0;

@@ -6,6 +6,7 @@
     "allowMixedContent": false,
     "captureInput": true,
     "webContentsDebuggingEnabled": false,
-    "backgroundColor": "#f4f5fa"
+    "resolveServiceWorkerRequests": false,
+    "backgroundColor": "#f7f3ec"
   }
 }

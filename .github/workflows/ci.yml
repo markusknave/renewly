@@ -87,6 +87,9 @@ jobs:
           echo "$SDK_ROOT/build-tools/36.0.0" >> "$GITHUB_PATH"
       - run: npm ci
       - run: npx cap sync android
+      - name: Run Robolectric shell tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --no-daemon
       - name: Build unsigned debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon

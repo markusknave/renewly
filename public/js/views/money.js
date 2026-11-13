@@ -74,7 +74,7 @@ export function cardsView({ methods = [], snapshots = [], today }) {
 		snapshots.find((snapshot) => Number(snapshot.method?.id ?? snapshot.id) === Number(id)) || null;
 	const rows = methods
 		.map((method) => {
-			const theme = cardThemeFor(method.label, method.kind, method.network);
+			const theme = cardThemeFor(method.label, method.kind, method.network, method.instrument);
 			return `<article class="method-card">
 				${bankCard(method, snapshotFor(method.id))}
 				<div class="method-meta">

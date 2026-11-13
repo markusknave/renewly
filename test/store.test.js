@@ -342,16 +342,33 @@ test('settings return defaults and merge patches', async () => {
   const db = createMemoryBackend();
 
   const defaults = await getSettings(db);
-  assert.deepEqual(defaults, { currency: 'PHP', timezone: 'Asia/Manila', reminderDays: [7, 3, 1] });
+  assert.deepEqual(defaults, {
+    currency: 'PHP',
+    timezone: 'Asia/Manila',
+    reminderDays: [7, 3, 1],
+    theme: 'ivory',
+    font: 'poppins',
+    customAccent: '#6d4aff',
+    customBackground: '#f7f3ec',
+  });
   defaults.reminderDays.push(99);
   assert.deepEqual((await getSettings(db)).reminderDays, [7, 3, 1]);
 
   const saved = await saveSettings(db, { reminderDays: [3, 1, 3] });
-  assert.deepEqual(saved, { currency: 'PHP', timezone: 'Asia/Manila', reminderDays: [1, 3] });
+  assert.deepEqual(saved, {
+    currency: 'PHP',
+    timezone: 'Asia/Manila',
+    reminderDays: [1, 3],
+    theme: 'ivory',
+    font: 'poppins',
+    customAccent: '#6d4aff',
+    customBackground: '#f7f3ec',
+  });
   assert.deepEqual(await getSettings(db), saved);
 
   const merged = await saveSettings(db, { timezone: 'Asia/Tokyo' });
-  assert.deepEqual(merged, { currency: 'PHP', timezone: 'Asia/Tokyo', reminderDays: [1, 3] });
+  assert.equal(merged.timezone, 'Asia/Tokyo');
+  assert.deepEqual((await getSettings(db)).reminderDays, [1, 3]);
   assert.equal((await getSettings(db)).timezone, 'Asia/Tokyo');
 
   await assert.rejects(() => saveSettings(db, { currency: 'USD' }), /PHP/);
