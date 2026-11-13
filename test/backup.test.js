@@ -220,7 +220,7 @@ test('version 4 backups round-trip ledger entries, goals, and card interest sett
 		})
 	);
 	const parsed = JSON.parse(text);
-	assert.equal(parsed.version, 4);
+	assert.equal(parsed.version, 5);
 	assert.equal(parsed.paymentMethods[0].interestRateBps, 325);
 	assert.equal(parsed.paymentMethods[0].instrument, 'debit');
 	assert.equal(parsed.goals[0].name, 'Japan trip');

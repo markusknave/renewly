@@ -161,7 +161,7 @@ test('settings puts the three data buttons in one row and uses a zone select', (
 	const row = html.match(/<div class="data-actions">([\s\S]*?)<\/div>/);
 	assert.ok(row, 'data-actions row is missing');
 	assert.equal((row[1].match(/data-action="(export|import|clear-data)"/g) || []).length, 3);
-	assert.match(html, /<select name="timezone">/);
+	assert.match(html, /<select name="timezone" data-searchable/);
 	assert.match(html, /<option value="Asia\/Manila" selected>/);
 	assert.match(html, /id="import-dialog"/);
 	assert.match(html, /id="import-file"/);
@@ -174,7 +174,7 @@ test('payment method screen filters providers by type', () => {
 			{ id: 2, label: 'BPI Visa', kind: 'card', last4: '4242', notes: '' },
 		],
 	});
-	assert.match(html, /<select name="provider" data-method-provider>/);
+	assert.match(html, /<select name="provider" data-method-provider data-searchable/);
 	assert.match(html, /<option value="GCash" selected>GCash<\/option>/);
 	assert.match(html, /<option value="__custom" selected>Other \/ custom…<\/option>/);
 	assert.match(html, /data-custom-method-label/);

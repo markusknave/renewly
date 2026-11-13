@@ -5,7 +5,14 @@
 import { addDays, isValidIsoDate, todayInTz } from './lib/dates.js';
 import { EXPENSE_CATEGORIES, categoryInfo } from './lib/categories.js';
 
-export const TRANSACTION_TYPES = ['expense', 'income', 'interest', 'goal_deposit', 'goal_withdrawal'];
+export const TRANSACTION_TYPES = [
+	'expense',
+	'income',
+	'transfer',
+	'interest',
+	'goal_deposit',
+	'goal_withdrawal',
+];
 export const INTEREST_FREQUENCIES = ['none', 'daily', 'monthly'];
 export const INTEREST_FREQUENCY_LABELS = {
 	none: 'No interest',
@@ -29,6 +36,8 @@ function integer(value, fallback = 0) {
 	return Number.isInteger(number) ? number : fallback;
 }
 
+// A transfer is neutral at the ledger level: it debits one account and credits
+// another. Use methodSignedCents to get one account's side of it.
 export function transactionSignedCents(transaction) {
 	const amount = integer(transaction?.amountCents);
 	switch (transaction?.type) {
@@ -42,6 +51,21 @@ export function transactionSignedCents(transaction) {
 		default:
 			return 0;
 	}
+}
+
+// Effect of one ledger row on one payment method. Transfers move money between
+// two methods, so the source is negative and the destination is positive.
+export function methodSignedCents(transaction, methodId) {
+	const id = Number(methodId);
+	if (!Number.isInteger(id)) return 0;
+	if (transaction?.type === 'transfer') {
+		const amount = Math.max(0, integer(transaction.amountCents));
+		if (Number(transaction.paymentMethodId) === id) return -amount;
+		if (Number(transaction.toPaymentMethodId) === id) return amount;
+		return 0;
+	}
+	if (Number(transaction?.paymentMethodId) !== id) return 0;
+	return transactionSignedCents(transaction);
 }
 
 export function methodOpeningCents(method) {
@@ -63,11 +87,10 @@ export function methodBalance(method, transactions, through = null) {
 	const openingDate = methodOpeningDate(method);
 	let balance = methodOpeningCents(method);
 	for (const transaction of Array.isArray(transactions) ? transactions : []) {
-		if (Number(transaction?.paymentMethodId) !== id) continue;
 		if (!isDate(transaction?.date)) continue;
 		if (openingDate && transaction.date < openingDate) continue;
 		if (through && transaction.date > through) continue;
-		balance += transactionSignedCents(transaction);
+		balance += methodSignedCents(transaction, id);
 	}
 	return balance;
 }
@@ -110,7 +133,8 @@ export function buildInterestPlan(method, transactions, today = localIsoToday())
 	const nonAuto = (Array.isArray(transactions) ? transactions : [])
 		.filter(
 			(transaction) =>
-				Number(transaction?.paymentMethodId) === id &&
+				(Number(transaction?.paymentMethodId) === id ||
+					Number(transaction?.toPaymentMethodId) === id) &&
 				!transaction?.auto &&
 				isDate(transaction?.date) &&
 				transaction.date >= start &&
@@ -130,7 +154,7 @@ export function buildInterestPlan(method, transactions, today = localIsoToday())
 		days += 1;
 		if (days > MAX_ACCRUAL_DAYS) break;
 		while (index < nonAuto.length && nonAuto[index].date < day) {
-			balance += transactionSignedCents(nonAuto[index]);
+			balance += methodSignedCents(nonAuto[index], id);
 			index += 1;
 		}
 
@@ -399,6 +423,8 @@ export function summarizePeriod(transactions, { from, to } = {}) {
 	let interestCents = 0;
 	let goalDepositCents = 0;
 	let goalWithdrawalCents = 0;
+	let transferCents = 0;
+	let transferCount = 0;
 	let largest = null;
 
 	for (const transaction of rows) {
@@ -431,6 +457,9 @@ export function summarizePeriod(transactions, { from, to } = {}) {
 			goalDepositCents += amount;
 		} else if (transaction.type === 'goal_withdrawal') {
 			goalWithdrawalCents += amount;
+		} else if (transaction.type === 'transfer') {
+			transferCents += amount;
+			transferCount += 1;
 		}
 	}
 
@@ -460,6 +489,8 @@ export function summarizePeriod(transactions, { from, to } = {}) {
 		interestCents,
 		goalDepositCents,
 		goalWithdrawalCents,
+		transferCents,
+		transferCount,
 		netCents: incomeCents + interestCents - expenseCents,
 		categories: categoryRows,
 		methodTotals: [...methods.entries()].map(([paymentMethodId, amountCents]) => ({

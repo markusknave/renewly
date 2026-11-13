@@ -7,7 +7,7 @@ export const EXPENSE_CATEGORIES = [
 		label: 'Food & drinks',
 		color: '#f97316',
 		icon: 'food',
-		keywords: ['food', 'eat', 'eating', 'restaurant', 'coffee', 'cafe', 'lunch', 'dinner', 'breakfast', 'snack', 'grabfood', 'foodpanda'],
+		keywords: ['food', 'eat', 'eating', 'restaurant', 'coffee', 'cafe', 'lunch', 'dinner', 'breakfast', 'snack', 'grabfood', 'foodpanda', 'burger', 'pizza', 'chicken', 'spaghetti', 'pasta', 'meal', 'drinks', 'beverage', 'jollibee', 'mcdo', 'mcdonald', 'kfc', 'chowking', 'starbucks', 'milk tea'],
 	},
 	{
 		key: 'groceries',

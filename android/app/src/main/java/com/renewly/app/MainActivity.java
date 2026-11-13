@@ -6,8 +6,6 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    private static final String EXTRA_QUICK_ADD = "com.renewly.app.QUICK_ADD";
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -17,8 +15,8 @@ public class MainActivity extends BridgeActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (intent != null && intent.getBooleanExtra(EXTRA_QUICK_ADD, false)) {
-            intent.removeExtra(EXTRA_QUICK_ADD);
+        if (intent != null && intent.getBooleanExtra(QuickAddNavigation.EXTRA_QUICK_ADD, false)) {
+            intent.removeExtra(QuickAddNavigation.EXTRA_QUICK_ADD);
             openExpenseTracker();
         }
     }
@@ -27,14 +25,7 @@ public class MainActivity extends BridgeActivity {
         if (bridge == null || bridge.getWebView() == null) {
             return;
         }
-        String base = bridge.getLocalUrl();
-        if (base == null || base.isEmpty()) {
-            base = "https://localhost";
-        }
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        final String url = base + "/#/expenses?new=1";
+        final String url = QuickAddNavigation.expensesUrl(bridge.getLocalUrl());
         bridge.getWebView().postDelayed(() -> bridge.getWebView().loadUrl(url), 350);
     }
 }

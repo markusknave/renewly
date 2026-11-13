@@ -15,6 +15,7 @@ test('Android manifest registers the quick-add widget receiver', () => {
 test('widget layout and metadata exist and open the add-expense route', () => {
 	for (const path of [
 		'java/com/renewly/app/QuickAddWidget.java',
+		'java/com/renewly/app/QuickAddNavigation.java',
 		'java/com/renewly/app/MainActivity.java',
 		'res/layout/widget_quick_add.xml',
 		'res/xml/widget_quick_add_info.xml',
@@ -23,8 +24,11 @@ test('widget layout and metadata exist and open the add-expense route', () => {
 		assert.ok(existsSync(new URL(path, root)), `missing ${path}`);
 	}
 	const activity = read('java/com/renewly/app/MainActivity.java');
-	assert.match(activity, /#\/expenses\?new=1/);
-	assert.match(activity, /QUICK_ADD/);
+	assert.match(activity, /QuickAddNavigation\.expensesUrl/);
+	assert.match(activity, /QuickAddNavigation\.EXTRA_QUICK_ADD/);
+	const navigation = read('java/com/renewly/app/QuickAddNavigation.java');
+	assert.match(navigation, /#\/expenses\?new=1/);
+	assert.match(navigation, /QUICK_ADD/);
 	const provider = read('java/com/renewly/app/QuickAddWidget.java');
 	assert.match(provider, /PendingIntent\.getActivity/);
 	assert.match(provider, /R\.layout\.widget_quick_add/);

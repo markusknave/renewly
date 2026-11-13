@@ -44,16 +44,6 @@ Users still on beta-1.2 or older must follow the beta-1.2-hotfix one-time
 export/uninstall/install/restore migration because that release rotated the
 signing key.
 
-## Verification
-
-- `npm test`: 105 tests passing.
-- `npm run test:coverage`: coverage thresholds pass.
-- `npm run security:check` and `npm run security:audit`: clean.
-- Browser smoke: income CSV preview, commit, type filter, manual income entry,
-  and balance/report direction.
-- GitHub Actions: test, security, Android, and CodeQL checks must pass before
-  merge; the release tag builds and verifies the signed APK.
-
 ## Install
 
 Download `renewly-beta-1.3.apk`, tap it on the phone, and allow **Install unknown

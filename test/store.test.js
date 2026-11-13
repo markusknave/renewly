@@ -46,11 +46,12 @@ function subscriptionInput(overrides = {}) {
 test('exports the contract constants', () => {
   assert.deepEqual(CADENCES, ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom']);
   assert.deepEqual(STATUSES, ['active', 'trial', 'paused', 'canceled']);
-  assert.deepEqual(PAYMENT_KINDS, ['card', 'ewallet', 'bank', 'cash', 'other']);
+  assert.deepEqual(PAYMENT_KINDS, ['card', 'ewallet', 'bank', 'credit', 'cash', 'other']);
   assert.deepEqual(PAYMENT_KIND_LABELS, {
     card: 'Card',
     ewallet: 'E-wallet',
-    bank: 'Bank transfer',
+    bank: 'Bank account',
+    credit: 'Credit / BNPL',
     cash: 'Cash',
     other: 'Other',
   });
@@ -333,7 +334,7 @@ test('saveExpense stores expenses and income separately', async () => {
 
   await assert.rejects(
     () => saveExpense(db, { type: 'refund', date: '2026-11-13', merchant: 'Bad', amountCents: 1 }),
-    /Type must be expense or income/
+    /Type must be expense, income, or transfer/
   );
 });
 

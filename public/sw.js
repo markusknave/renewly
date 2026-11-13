@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renewly-shell-v9';
+const CACHE_NAME = 'renewly-shell-v11';
 const APP_ASSETS = [
 	'./',
 	'./index.html',
@@ -20,6 +20,8 @@ const APP_ASSETS = [
 	'./js/insights.js',
 	'./js/import.js',
 	'./js/export.js',
+	'./js/receipt.js',
+	'./js/ocr.js',
 	'./js/importers/table.js',
 	'./js/importers/csv.js',
 	'./js/importers/xlsx.js',
@@ -35,6 +37,11 @@ const APP_ASSETS = [
 	'./js/lib/timezones.js',
 	'./js/lib/categories.js',
 	'./js/lib/cardThemes.js',
+	'./js/lib/combobox.js',
+	'./vendor/tesseract/tesseract.min.js',
+	'./vendor/tesseract/worker.min.js',
+	'./vendor/tesseract/tesseract-core-lstm.wasm.js',
+	'./vendor/tesseract/lang/eng.traineddata.gz',
 	'./data/plans.json',
 	'./manifest.webmanifest',
 	'./favicon.svg',

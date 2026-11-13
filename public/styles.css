@@ -1081,6 +1081,10 @@ hr {
   color: var(--ok);
 }
 
+.activity-amount.move {
+  color: var(--brand);
+}
+
 .cat-badge {
   display: inline-grid;
   place-items: center;
@@ -1446,6 +1450,11 @@ hr {
 
 .txn-amount.in {
   color: var(--ok);
+}
+
+.txn-amount.move,
+.activity-amount.move {
+  color: var(--brand);
 }
 
 .txn-actions {
@@ -1905,6 +1914,177 @@ textarea {
   min-height: 2.6rem;
 }
 
+/* Searchable selects keep a native select for form data and add a themed
+   trigger plus a filtered option panel. */
+.combo {
+  position: relative;
+  min-width: 0;
+}
+
+.combo-native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  clip-path: inset(50%);
+}
+
+.combo-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 2.35rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 11px;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.combo-trigger:hover {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--line));
+}
+
+.combo-trigger:focus-visible,
+.combo.is-open .combo-trigger {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 20%, transparent);
+}
+
+.combo-trigger:disabled {
+  color: var(--muted);
+  background: var(--bg-soft);
+  cursor: not-allowed;
+}
+
+.combo-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combo-caret {
+  flex: none;
+  width: 0.48rem;
+  height: 0.48rem;
+  margin-right: 0.15rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.15s ease;
+}
+
+.combo.is-open .combo-caret {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.combo-panel {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 40px color-mix(in srgb, #000 20%, transparent);
+}
+
+.combo-panel[hidden] {
+  display: none;
+}
+
+.combo-search {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 9px;
+  font-size: 0.85rem;
+}
+
+.combo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.combo-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.combo-option:hover,
+.combo-option.is-active {
+  background: var(--brand-soft);
+  color: var(--brand-text);
+}
+
+.combo-option[aria-selected="true"] {
+  font-weight: 800;
+}
+
+.combo-option[aria-selected="true"]::after {
+  content: "✓";
+  float: right;
+  color: var(--brand);
+}
+
+.combo-option:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.combo-empty {
+  margin: 0.35rem 0.55rem 0.45rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--brand) 5%, var(--panel));
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.check-row input[type="checkbox"] {
+  width: auto;
+  flex: none;
+  margin-top: 0.15rem;
+  accent-color: var(--brand);
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -2197,6 +2377,45 @@ textarea {
 
 .dialog-head h2 {
   margin: 0;
+}
+
+.scan-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand) 5%, var(--surface));
+}
+
+.scan-row .hint,
+.scan-row [data-scan-status] {
+  flex: 1 1 180px;
+}
+
+.scan-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.scan-row [data-scan-status].is-error {
+  color: var(--danger);
+}
+
+.import-transfer-select {
+  display: block;
+  margin-top: 0.25rem;
+  min-width: 9rem;
+}
+
+.is-busy [data-scan-button] {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* --------------------------------------------------------------- toolbar */

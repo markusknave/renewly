@@ -77,6 +77,8 @@ const ICONS = {
 	dots: '<circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/>',
 	chevron: '<path d="m9 6 6 6-6 6"/>',
 	refresh: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
+	camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.4"/>',
+	transfer: '<path d="M4 8h13"/><path d="m14 5 3 3-3 3"/><path d="M20 16H7"/><path d="m10 13-3 3 3 3"/>',
 };
 
 export function icon(name, className = 'icon') {
@@ -108,8 +110,8 @@ export function providerOptions(kind, selected) {
 
 export function methodProviderField(kind, label) {
 	const custom = Boolean(label) && !providersFor(kind).includes(label);
-	return `<label>Bank / E-wallet
-		<select name="provider" data-method-provider>${providerOptions(kind, label)}</select>
+	return `<label>Provider
+		<select name="provider" data-method-provider data-searchable data-combo-placeholder="Search banks, wallets, or credit providers…">${providerOptions(kind, label)}</select>
 	</label>
 	<label data-custom-method-label${custom ? '' : ' hidden'}>Custom label
 		<input type="text" name="customLabel" maxlength="60" value="${
@@ -308,3 +310,5 @@ export function progressBar(percent, color = 'var(--brand)') {
 export function emptyState(title, body, action = '') {
 	return `<div class="empty"><h3>${esc(title)}</h3><p class="muted">${esc(body)}</p>${action}</div>`;
 }
+
+export { enhanceSelects, refreshSelect, refreshSelects } from '../lib/combobox.js';

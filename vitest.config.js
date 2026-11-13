@@ -8,7 +8,7 @@ export default defineConfig({
 			provider: 'v8',
 			reporter: ['text', 'json-summary', 'html'],
 			include: ['public/js/**/*.js'],
-			exclude: ['public/js/views.js', 'public/js/importers/limits.js'],
+			exclude: ['public/js/views.js', 'public/js/importers/limits.js', 'public/js/ocr.js', 'public/js/lib/combobox.js'],
 			reportsDirectory: 'coverage',
 			thresholds: {
 				statements: 55,

@@ -15,7 +15,7 @@ import { rowsToTransactions, linesToTransactions, parseAnyDate, parseMoney } fro
 import { buildReport, toPdf, toXlsx } from '../public/js/export.js';
 import { methodBalance } from '../public/js/finance.js';
 import { createMemoryBackend } from '../public/js/db.js';
-import { listTransactions, savePaymentMethod } from '../public/js/store.js';
+import { listTransactions, listPaymentMethods, savePaymentMethod } from '../public/js/store.js';
 
 const methods = [
 	{ id: 1, label: 'BPI Debit' },
@@ -251,15 +251,101 @@ test('importRows commits expenses and income and skips duplicates', async () => 
 		{ type: 'income', date: '2026-11-02', merchant: 'Salary', amountCents: 50_000, category: 'income', notes: '', paymentMethodId: account.id },
 	];
 	const first = await importRows(db, rows, { existing: [] });
-	assert.deepEqual(first, { imported: 2, importedExpense: 1, importedIncome: 1, skipped: 1, failed: 0 });
+	assert.deepEqual(first, {
+		imported: 2,
+		importedExpense: 1,
+		importedIncome: 1,
+		importedTransfer: 0,
+		skipped: 1,
+		failed: 0,
+		needsAccount: 0,
+		createdMethods: [],
+	});
 	const second = await importRows(db, rows, { existing: await listTransactions(db) });
-	assert.deepEqual(second, { imported: 0, importedExpense: 0, importedIncome: 0, skipped: 3, failed: 0 });
+	assert.deepEqual(second, {
+		imported: 0,
+		importedExpense: 0,
+		importedIncome: 0,
+		importedTransfer: 0,
+		skipped: 3,
+		failed: 0,
+		needsAccount: 0,
+		createdMethods: [],
+	});
 	const transactions = await listTransactions(db);
 	assert.equal(transactions.length, 2);
 	assert.equal(transactions.find((row) => row.type === 'expense').amountCents, 12_550);
 	assert.equal(transactions.find((row) => row.type === 'income').amountCents, 50_000);
 	assert.equal(transactions.find((row) => row.type === 'income').category, 'income');
 	assert.equal(methodBalance(account, transactions, '2026-11-30'), 137_450);
+});
+
+test('imports create missing cards and wallets from the account column', async () => {
+	const db = createMemoryBackend();
+	const bpi = await savePaymentMethod(db, {
+		label: 'BPI Debit',
+		kind: 'card',
+		openingBalanceCents: 100_000,
+		openingDate: '2026-11-01',
+	});
+	const csv = [
+		'Date,Description,Amount,Type,Account',
+		'2026-11-02,Atome order,1200.00,Expense,Atome',
+		'2026-11-03,Lunch,150.00,Expense,BPI Debit',
+	].join('\n');
+	const preview = await parseImportFile(
+		fileLike('statement.csv', csv, 'text/csv'),
+		{ methods: [bpi], defaultMethodId: bpi.id, today: '2026-11-13' }
+	);
+	assert.deepEqual(preview.missingMethods, [{ label: 'Atome', kind: 'credit' }]);
+	const atomeRow = preview.rows.find((row) => row.merchant === 'Atome order');
+	assert.equal(atomeRow.paymentMethodId, null);
+	assert.equal(atomeRow.missingMethod, 'Atome');
+
+	const result = await importRows(db, preview.rows, {
+		defaultMethodId: bpi.id,
+		existing: [],
+		createMissingMethods: true,
+		today: '2026-11-13',
+	});
+	assert.equal(result.createdMethods.length, 1);
+	assert.equal(result.createdMethods[0].label, 'Atome');
+	assert.equal(result.createdMethods[0].kind, 'credit');
+	const methods = await listPaymentMethods(db);
+	const atome = methods.find((method) => method.label === 'Atome');
+	assert.equal(atome.kind, 'credit');
+	assert.equal(atome.instrument, 'credit');
+	assert.equal(atome.openingBalanceCents, 0);
+	const transactions = await listTransactions(db);
+	assert.equal(transactions.length, 2);
+	assert.equal(methodBalance(atome, transactions, '2026-11-30'), -120_000);
+	assert.equal(methodBalance(bpi, transactions, '2026-11-30'), 85_000);
+});
+
+test('missing accounts fall back to the default when creation is off', async () => {
+	const db = createMemoryBackend();
+	const bpi = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card', openingBalanceCents: 100_000 });
+	const rows = [
+		{
+			type: 'expense',
+			date: '2026-11-02',
+			merchant: 'Atome order',
+			amountCents: 120_000,
+			category: 'shopping',
+			notes: '',
+			paymentMethodId: null,
+			missingMethod: 'Atome',
+		},
+	];
+	const result = await importRows(db, rows, {
+		defaultMethodId: bpi.id,
+		existing: [],
+		createMissingMethods: false,
+	});
+	assert.deepEqual(result.createdMethods, []);
+	assert.equal((await listPaymentMethods(db)).length, 1);
+	const [transaction] = await listTransactions(db);
+	assert.equal(transaction.paymentMethodId, bpi.id);
 });
 
 test('analyst helpers recategorize and summarize imported rows', () => {
