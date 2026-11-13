@@ -104,7 +104,10 @@ export function cardsView({ methods = [], snapshots = [], today }) {
 
 	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Cards & wallets' }])}<div class="page-head">
 		<div><p class="eyebrow">Money</p><h1>Cards & wallets</h1><p class="muted">Balances and interest are simulated on this device. Renewly never asks for a full card number.</p></div>
-		<div class="page-head-actions"><a class="btn" href="#/">Back to dashboard</a></div>
+		<div class="page-head-actions">
+			<button class="btn" type="button" data-action="new-transfer">${icon('transfer')} Transfer money</button>
+			<a class="btn" href="#/">Back to dashboard</a>
+		</div>
 	</div>
 	<section class="panel">
 		<div class="panel-head"><h2>Add a card or wallet</h2></div>

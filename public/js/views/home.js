@@ -23,6 +23,9 @@ function activityBadge(transaction) {
 	if (transaction.type === 'goal_deposit' || transaction.type === 'goal_withdrawal') {
 		return `<span class="cat-badge cat-badge-goal" style="--cat:#7c3aed">${icon('target')}</span>`;
 	}
+	if (transaction.type === 'transfer') {
+		return `<span class="cat-badge" style="--cat:#2563eb">${icon('transfer')}</span>`;
+	}
 	if (transaction.type === 'income') {
 		return `<span class="cat-badge cat-badge-income" style="--cat:#16a34a">${icon('arrowDown')}</span>`;
 	}
@@ -31,6 +34,7 @@ function activityBadge(transaction) {
 
 function activityRow(transaction, methods) {
 	const method = methods.find((row) => Number(row.id) === Number(transaction.paymentMethodId));
+	const target = methods.find((row) => Number(row.id) === Number(transaction.toPaymentMethodId));
 	const out = transaction.type === 'expense' || transaction.type === 'goal_deposit';
 	const label =
 		transaction.type === 'interest'
@@ -39,22 +43,26 @@ function activityRow(transaction, methods) {
 				? transaction.merchant
 				: transaction.type === 'goal_withdrawal'
 					? transaction.merchant
-					: transaction.merchant;
+					: transaction.type === 'transfer'
+						? 'Account transfer'
+						: transaction.merchant;
 	const detail =
 		transaction.type === 'expense'
 			? `${categoryLabel(transaction.category)}${method ? ` · ${method.label}` : ''}`
-			: transaction.type === 'interest'
-				? `${method ? method.label : 'Payment method'} · automatic`
-				: `${method ? method.label : 'No method'}`;
+			: transaction.type === 'transfer'
+				? `${method ? method.label : 'Account'} → ${target ? target.label : 'Account'}`
+				: transaction.type === 'interest'
+					? `${method ? method.label : 'Payment method'} · automatic`
+					: `${method ? method.label : 'No method'}`;
 	return `<li class="activity-row">
 		${activityBadge(transaction)}
 		<div class="activity-main">
 			<strong>${esc(label)}</strong>
 			<span class="sub">${esc(detail)}</span>
 		</div>
-		<div class="activity-amount ${out ? 'out' : 'in'}">${out ? '−' : '+'}${esc(
-			formatMoney(transaction.amountCents, 'PHP')
-		)}</div>
+		<div class="activity-amount ${transaction.type === 'transfer' ? 'move' : out ? 'out' : 'in'}">${
+			transaction.type === 'transfer' ? '⇄ ' : out ? '−' : '+'
+		}${esc(formatMoney(transaction.amountCents, 'PHP'))}</div>
 	</li>`;
 }
 
@@ -243,7 +251,7 @@ export function homeView({
 	<section class="quick-actions">
 		<button class="quick-action" type="button" data-action="new-expense">${icon('receipt')}<span>Log expense</span></button>
 		<button class="quick-action" type="button" data-action="new-goal">${icon('target')}<span>New goal</span></button>
+		<button class="quick-action" type="button" data-action="new-transfer">${icon('transfer')}<span>Transfer money</span></button>
 		<a class="quick-action" href="#/insights">${icon('sparkles')}<span>Ask the analyst</span></a>
-		<a class="quick-action" href="#/expenses">${icon('download')}<span>Export reports</span></a>
 	</section>`;
 }

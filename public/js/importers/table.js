@@ -19,9 +19,24 @@ const FIELD_ALIASES = {
 
 const INCOME_TYPE = /^(credit|income|deposit|inflow|moneyin|paidin|in|salary|payroll|refund|interest)$/i;
 const EXPENSE_TYPE = /^(debit|expense|withdrawal|withdraw|outflow|moneyout|charge|out|purchase|payment)$/i;
+const TRANSFER_TYPE = /^(transfer|transfers|fundtransfer|banktransfer|accounttransfer|instapay|pesonet|sendmoney|remittance)$/i;
 const INCOME_TEXT = /\b(salary|payroll|refund|interest\s+(?:earned|received)|cash\s+in|deposit|money\s+in|inflow|credit)\b/i;
 const EXPENSE_TEXT = /\b(expense|purchase|payment|withdrawal|debit|money\s+out|outflow|charge)\b/i;
+const TRANSFER_TEXT = /\b(transfer(?:red|s)?|fund\s+transfer|instapay|pesonet|sent\s+(?:to|via)|received\s+from|transfer\s+(?:to|from))\b/i;
+const TRANSFER_IN_TEXT = /\b(received|received\s+from|credited|incoming|transfer\s+from|fund\s+transfer\s+from|cash\s+in)\b/i;
+const TRANSFER_OUT_TEXT = /\b(sent|sent\s+to|transferred\s+to|transfer\s+to|outgoing|fund\s+transfer\s+to)\b/i;
 const CREDIT_CARD_TEXT = /\bcredit\s*card\b/i;
+const GENERIC_METHOD_TOKENS = new Set([
+	'bank',
+	'debit',
+	'credit',
+	'account',
+	'wallet',
+	'card',
+	'cash',
+	'other',
+	'transfer',
+]);
 
 function escapeRegex(value) {
 	return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -44,14 +59,17 @@ export function normalizeMerchant(value) {
 
 function classifyType(typeText, categoryText, descriptionText = '') {
 	const type = normalizeHeader(typeText);
+	if (TRANSFER_TYPE.test(type)) return 'transfer';
 	if (EXPENSE_TYPE.test(type)) return 'expense';
 	if (INCOME_TYPE.test(type)) return 'income';
 	const category = normalizeHeader(categoryText);
+	if (TRANSFER_TYPE.test(category)) return 'transfer';
 	if (EXPENSE_TYPE.test(category)) return 'expense';
 	if (INCOME_TYPE.test(category)) return 'income';
 	const text = `${categoryText} ${descriptionText}`.trim();
 	if (!text) return null;
 	if (INCOME_TEXT.test(text) && !CREDIT_CARD_TEXT.test(text)) return 'income';
+	if (TRANSFER_TEXT.test(text) && !CREDIT_CARD_TEXT.test(text)) return 'transfer';
 	if (EXPENSE_TEXT.test(text)) return 'expense';
 	return null;
 }
@@ -233,30 +251,73 @@ export function matchMethod(value, methods = []) {
 	return null;
 }
 
-export function duplicateKey(row, paymentMethodId = null) {
+// Finds the other account named in a transfer description. It ignores generic
+// words such as "bank" or "debit" so "BPI Debit" is not matched by every bank
+// row, and it can skip the statement's own account.
+export function matchTransferMethod(value, methods = [], excludeId = null) {
+	const normalized = normalizeHeader(value);
+	if (!normalized) return null;
+	let bestId = null;
+	let bestScore = 0;
+	for (const method of methods) {
+		if (excludeId !== null && String(method.id) === String(excludeId)) continue;
+		const label = normalizeHeader(method.label);
+		if (!label) continue;
+		let score = 0;
+		if (normalized.includes(label)) {
+			score = label.length + 10;
+		} else {
+			for (const token of String(method.label || '')
+				.toLowerCase()
+				.split(/[^a-z0-9]+/)
+				.filter((part) => part.length >= 3 && !GENERIC_METHOD_TOKENS.has(part))) {
+				if (normalized.includes(token)) score += token.length;
+			}
+		}
+		if (method.last4 && normalized.includes(String(method.last4))) score += 4;
+		if (score > bestScore) {
+			bestScore = score;
+			bestId = method.id;
+		}
+	}
+	return bestId;
+}
+
+export function transferDirection(text) {
+	const value = String(text ?? '');
+	if (TRANSFER_IN_TEXT.test(value) && !TRANSFER_OUT_TEXT.test(value)) return 'in';
+	return 'out';
+}
+
+export function duplicateKey(row, paymentMethodId = null, transferMethodId = null) {
+	const otherAccount = row?.type === 'transfer'
+		? transferMethodId ?? row.transferMethodId ?? row.toPaymentMethodId ?? ''
+		: '';
 	return [
 		row.date,
-		row.type === 'income' ? 'income' : 'expense',
+		row.type === 'income' ? 'income' : row.type === 'transfer' ? 'transfer' : 'expense',
 		row.amountCents,
 		normalizeMerchant(row.merchant),
 		paymentMethodId ?? '',
+		otherAccount ?? '',
 	].join('|');
 }
 
 export function finalizeRows(rows, existing = []) {
 	const keys = new Set(
 		(Array.isArray(existing) ? existing : [])
-			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
+			.filter((row) => row && ['expense', 'income', 'transfer'].includes(row.type))
 			.map((row) =>
 				duplicateKey(
 					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
-					row.paymentMethodId ?? null
+					row.paymentMethodId ?? null,
+					row.toPaymentMethodId ?? null
 				)
 			)
 	);
 	let duplicates = 0;
 	const finalized = (Array.isArray(rows) ? rows : []).map((row) => {
-		const key = duplicateKey(row, row.paymentMethodId ?? null);
+		const key = duplicateKey(row, row.paymentMethodId ?? null, row.transferMethodId ?? null);
 		if (keys.has(key)) {
 			duplicates += 1;
 			return { ...row, duplicate: true };
@@ -300,7 +361,7 @@ export function rowsToTransactions(rows, options = {}) {
 			.slice(0, 20)
 			.map((row) => String(cell(row, mapping.category) || '').trim())
 			.filter(Boolean);
-		const typeLike = values.filter((value) => /^(debit|credit|withdraw|deposit|moneyin|moneyout|income|expense|salary|refund|in|out)$/i.test(value)).length;
+		const typeLike = values.filter((value) => /^(debit|credit|withdraw|deposit|moneyin|moneyout|income|expense|salary|refund|transfer|in|out)$/i.test(value)).length;
 		const headerLooksType = /^(type|transactiontype|drcr|debitcredit|direction)$/.test(headerText);
 		if (headerLooksType || (values.length > 0 && typeLike >= Math.ceil(values.length * 0.6))) {
 			mapping.type = mapping.category;
@@ -309,11 +370,12 @@ export function rowsToTransactions(rows, options = {}) {
 	}
 	const existingKeys = new Set(
 		(Array.isArray(existing) ? existing : [])
-			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
+			.filter((row) => row && ['expense', 'income', 'transfer'].includes(row.type))
 			.map((row) =>
 				duplicateKey(
 					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
-					row.paymentMethodId ?? null
+					row.paymentMethodId ?? null,
+					row.toPaymentMethodId ?? null
 				)
 			)
 	);
@@ -325,6 +387,9 @@ export function rowsToTransactions(rows, options = {}) {
 	let incomeCount = 0;
 	let expenseCents = 0;
 	let incomeCents = 0;
+	let transferCount = 0;
+	let transferCents = 0;
+	let transfersMissingAccount = 0;
 
 	for (const row of dataRows) {
 		if (!Array.isArray(row) || row.every((value) => String(value ?? '').trim() === '')) continue;
@@ -338,6 +403,7 @@ export function rowsToTransactions(rows, options = {}) {
 		const categoryText = String(cell(row, mapping.category) || '').trim();
 		const descriptionCell = String(cell(row, mapping.description) || '').trim();
 		let type = classifyType(typeText, categoryText, descriptionCell);
+		let direction = transferDirection(`${typeText} ${categoryText} ${descriptionCell}`);
 
 		let amountCents = null;
 		const debitText = mapping.debit >= 0 ? String(cell(row, mapping.debit) || '').trim() : '';
@@ -346,10 +412,12 @@ export function rowsToTransactions(rows, options = {}) {
 		const creditCents = creditText ? parseMoney(creditText) : null;
 		if (debitCents) {
 			amountCents = debitCents;
-			type = 'expense';
+			direction = 'out';
+			if (type !== 'transfer') type = 'expense';
 		} else if (creditCents) {
 			amountCents = creditCents;
-			type = 'income';
+			direction = 'in';
+			if (type !== 'transfer') type = 'income';
 		} else if (debitText || creditText) {
 			invalid += 1;
 			continue;
@@ -362,7 +430,7 @@ export function rowsToTransactions(rows, options = {}) {
 				: parseMoney(rawAmount);
 			if (!type) type = 'expense';
 		}
-		type = type === 'income' ? 'income' : 'expense';
+		type = type === 'income' ? 'income' : type === 'transfer' ? 'transfer' : 'expense';
 		if (!amountCents) {
 			invalid += 1;
 			continue;
@@ -373,13 +441,23 @@ export function rowsToTransactions(rows, options = {}) {
 			.map((value) => String(value ?? '').trim())
 			.filter(Boolean)
 			.join(' ')
-			.slice(0, 60) || (type === 'income' ? 'Imported income' : 'Imported expense');
+			.slice(0, 60) || (type === 'income' ? 'Imported income' : type === 'transfer' ? 'Account transfer' : 'Imported expense');
 		const notes = String(cell(row, mapping.notes) || '').trim().slice(0, 500);
 		const category = type === 'income'
 			? INCOME_CATEGORY
-			: mapCategory(categoryText) || detectCategory(`${description} ${notes}`) || 'other';
+			: type === 'transfer'
+				? 'other'
+				: mapCategory(categoryText) || detectCategory(`${description} ${notes}`) || 'other';
 		const methodText = cell(row, mapping.method);
 		const paymentMethodId = matchMethod(methodText, methods) ?? defaultMethodId ?? null;
+		const transferMethodId = type === 'transfer'
+			? matchTransferMethod(
+					`${description} ${notes} ${String(methodText ?? '')}`,
+					methods,
+					paymentMethodId
+				)
+			: null;
+		if (type === 'transfer' && transferMethodId === null) transfersMissingAccount += 1;
 		const transaction = {
 			type,
 			date,
@@ -388,17 +466,22 @@ export function rowsToTransactions(rows, options = {}) {
 			category,
 			notes,
 			paymentMethodId,
+			transferMethodId,
+			direction: type === 'transfer' ? direction : null,
 			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
 			source: sourceLabel,
 		};
 		if (type === 'income') {
 			incomeCount += 1;
 			incomeCents += amountCents;
+		} else if (type === 'transfer') {
+			transferCount += 1;
+			transferCents += amountCents;
 		} else {
 			expenseCount += 1;
 			expenseCents += amountCents;
 		}
-		const key = duplicateKey(transaction, paymentMethodId);
+		const key = duplicateKey(transaction, paymentMethodId, transferMethodId);
 		if (existingKeys.has(key) || seen.has(key)) {
 			transaction.duplicate = true;
 			duplicates += 1;
@@ -418,6 +501,9 @@ export function rowsToTransactions(rows, options = {}) {
 			incomeCount,
 			expenseCents,
 			incomeCents,
+			transferCount,
+			transferCents,
+			transfersMissingAccount,
 		},
 	};
 }
@@ -440,11 +526,12 @@ export function linesToTransactions(lines, options = {}) {
 	} = options;
 	const existingKeys = new Set(
 		(existing || [])
-			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
+			.filter((row) => row && ['expense', 'income', 'transfer'].includes(row.type))
 			.map((row) =>
 				duplicateKey(
 					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
-					row.paymentMethodId ?? null
+					row.paymentMethodId ?? null,
+					row.toPaymentMethodId ?? null
 				)
 			)
 	);
@@ -456,6 +543,9 @@ export function linesToTransactions(lines, options = {}) {
 	let incomeCount = 0;
 	let expenseCents = 0;
 	let incomeCents = 0;
+	let transferCount = 0;
+	let transferCents = 0;
+	let transfersMissingAccount = 0;
 
 	const datePattern = /(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4})/i;
 	const amountPattern = /([-−]?\s*(?:₱|php|p)?\s*\(?\d[\d,]*\.\d{2}\)?)\s*$/i;
@@ -479,7 +569,9 @@ export function linesToTransactions(lines, options = {}) {
 			invalid += 1;
 			continue;
 		}
-		const type = classifyType('', '', line) === 'income' ? 'income' : 'expense';
+		const classified = classifyType('', '', line);
+		const type = classified === 'income' ? 'income' : classified === 'transfer' ? 'transfer' : 'expense';
+		const direction = transferDirection(line);
 		const amountCents = parseMoney(amountMatch[1]);
 		if (!amountCents) {
 			invalid += 1;
@@ -504,8 +596,16 @@ export function linesToTransactions(lines, options = {}) {
 			description = description.replace(new RegExp(`\\s+${escapeRegex(category.label)}$`, 'i'), '').trim();
 		}
 		if (!description) description = rawDescription;
-		const category = type === 'income' ? INCOME_CATEGORY : detectCategory(rawDescription) || 'other';
+		const category = type === 'income'
+			? INCOME_CATEGORY
+			: type === 'transfer'
+				? 'other'
+				: detectCategory(rawDescription) || 'other';
 		const paymentMethodId = matchMethod(methodText, methods) ?? defaultMethodId ?? null;
+		const transferMethodId = type === 'transfer'
+			? matchTransferMethod(rawDescription, methods, paymentMethodId)
+			: null;
+		if (type === 'transfer' && transferMethodId === null) transfersMissingAccount += 1;
 		const transaction = {
 			type,
 			date,
@@ -514,17 +614,22 @@ export function linesToTransactions(lines, options = {}) {
 			category,
 			notes: rawDescription.slice(0, 500),
 			paymentMethodId,
+			transferMethodId,
+			direction: type === 'transfer' ? direction : null,
 			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
 			source: sourceLabel,
 		};
 		if (type === 'income') {
 			incomeCount += 1;
 			incomeCents += amountCents;
+		} else if (type === 'transfer') {
+			transferCount += 1;
+			transferCents += amountCents;
 		} else {
 			expenseCount += 1;
 			expenseCents += amountCents;
 		}
-		const key = duplicateKey(transaction, paymentMethodId);
+		const key = duplicateKey(transaction, paymentMethodId, transferMethodId);
 		if (existingKeys.has(key) || seen.has(key)) {
 			transaction.duplicate = true;
 			duplicates += 1;
@@ -544,6 +649,9 @@ export function linesToTransactions(lines, options = {}) {
 			incomeCount,
 			expenseCents,
 			incomeCents,
+			transferCount,
+			transferCents,
+			transfersMissingAccount,
 		},
 	};
 }

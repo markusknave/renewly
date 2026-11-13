@@ -19,8 +19,8 @@ import { INSTRUMENTS } from './lib/cardThemes.js';
 import { INTEREST_FREQUENCIES, TRANSACTION_TYPES } from './finance.js';
 
 export const EXPORT_APP = 'renewly';
-export const EXPORT_VERSION = 4;
-export const SUPPORTED_IMPORT_VERSIONS = [1, 2, 3, 4];
+export const EXPORT_VERSION = 5;
+export const SUPPORTED_IMPORT_VERSIONS = [1, 2, 3, 4, 5];
 
 const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'cash', 'other'];
 const SUBSCRIPTION_KINDS = ['recurring', 'one_time'];
@@ -128,6 +128,7 @@ export function buildExport(
 			date: transaction.date,
 			amountCents: integerOr(transaction.amountCents, 0),
 			paymentMethodId: transaction.paymentMethodId ?? null,
+			toPaymentMethodId: transaction.toPaymentMethodId ?? null,
 			goalId: transaction.goalId ?? null,
 			category: transaction.category ?? 'other',
 			merchant: transaction.merchant ?? '',
@@ -262,17 +263,23 @@ export function normalizeBackup(parsed) {
 			const amount = integerOr(transaction.amountCents, 0);
 			if (!type || amount <= 0 || !isIsoDate(transaction.date)) return null;
 			const auto = Boolean(transaction.auto) && type === 'interest';
+			const oldToPaymentMethodId =
+				type === 'transfer' ? transaction.toPaymentMethodId ?? null : null;
 			return {
 				oldId: transaction.id ?? null,
 				type,
 				date: transaction.date,
 				amountCents: amount,
 				oldPaymentMethodId: transaction.paymentMethodId ?? null,
+				oldToPaymentMethodId,
 				oldGoalId: transaction.goalId ?? null,
 				category: type === 'income'
 					? INCOME_CATEGORY
-					: CATEGORY_KEYS.includes(transaction.category) ? transaction.category : 'other',
-				merchant: text(transaction.merchant, MAX_EXPENSE_MERCHANT) || (type === 'interest' ? 'Interest earned' : 'Entry'),
+					: type === 'transfer'
+						? 'other'
+						: CATEGORY_KEYS.includes(transaction.category) ? transaction.category : 'other',
+				merchant: text(transaction.merchant, MAX_EXPENSE_MERCHANT)
+					|| (type === 'interest' ? 'Interest earned' : type === 'transfer' ? 'Account transfer' : 'Entry'),
 				notes: text(transaction.notes, MAX_TRANSACTION_NOTES),
 				auto,
 				autoKey: auto ? text(transaction.autoKey, 80) || null : null,
@@ -411,15 +418,29 @@ export async function applyBackup(db, backup, now = new Date()) {
 			transaction.oldPaymentMethodId != null
 				? methodIds.get(transaction.oldPaymentMethodId) ?? null
 				: null;
+		const toPaymentMethodId =
+			transaction.oldToPaymentMethodId != null
+				? methodIds.get(transaction.oldToPaymentMethodId) ?? null
+				: null;
 		const goalId =
 			transaction.oldGoalId != null ? goalIds.get(transaction.oldGoalId) ?? null : null;
 		// Goal transfers without their goal would create money out of nothing.
 		if (transaction.type.startsWith('goal_') && goalId === null) continue;
+		// A transfer needs both sides; one-sided rows would mint or destroy money.
+		if (
+			transaction.type === 'transfer' &&
+			(paymentMethodId === null ||
+				toPaymentMethodId === null ||
+				paymentMethodId === toPaymentMethodId)
+		) {
+			continue;
+		}
 		await db.put('transactions', {
 			type: transaction.type,
 			date: transaction.date,
 			amountCents: transaction.amountCents,
 			paymentMethodId,
+			toPaymentMethodId,
 			goalId,
 			category: transaction.category,
 			merchant: transaction.merchant,

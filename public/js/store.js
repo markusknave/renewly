@@ -4,6 +4,7 @@ import {
 	INTEREST_FREQUENCIES,
 	TRANSACTION_TYPES,
 	goalSavedCents,
+	methodBalance,
 	methodSnapshot,
 	sortTransactions,
 } from './finance.js';
@@ -564,9 +565,20 @@ export async function deletePaymentMethod(db, id) {
   }
 
   // Interest rows belong to the deleted method; spend and goal history stays,
-  // with the method reference cleared so the ledger remains intact.
+  // with the method reference cleared so the ledger remains intact. Transfers
+  // that involve the deleted account are removed: keeping one side would create
+  // money out of nothing.
   const transactions = await db.getAll('transactions');
   for (const transaction of transactions) {
+    if (transaction.type === 'transfer') {
+      if (
+        Number(transaction.paymentMethodId) === key ||
+        Number(transaction.toPaymentMethodId) === key
+      ) {
+        await db.delete('transactions', transaction.id);
+      }
+      continue;
+    }
     if (Number(transaction.paymentMethodId) !== key) continue;
     if (transaction.auto && transaction.type === 'interest') {
       await db.delete('transactions', transaction.id);
@@ -758,22 +770,30 @@ export function validateExpenseInput(input) {
   const rawType = source.type === undefined || source.type === null || source.type === ''
     ? 'expense'
     : source.type;
-  if (rawType !== 'expense' && rawType !== 'income') {
-    errors.type = 'Type must be expense or income.';
+  if (rawType !== 'expense' && rawType !== 'income' && rawType !== 'transfer') {
+    errors.type = 'Type must be expense, income, or transfer.';
   }
-  const type = rawType === 'income' ? 'income' : 'expense';
+  const type = rawType === 'income' ? 'income' : rawType === 'transfer' ? 'transfer' : 'expense';
 
   const date = normalizeDate(source.date, errors, 'date', 'Date');
   if (!date) errors.date = 'Date is required (YYYY-MM-DD).';
 
   const merchant = trimString(source.merchant);
-  if (!merchant) {
+  if (type === 'transfer') {
+    if (merchant.length > MAX_EXPENSE_MERCHANT) {
+      errors.merchant = `Description must be ${MAX_EXPENSE_MERCHANT} characters or fewer.`;
+    }
+  } else if (!merchant) {
     errors.merchant = 'Description is required.';
   } else if (merchant.length > MAX_EXPENSE_MERCHANT) {
     errors.merchant = `Description must be ${MAX_EXPENSE_MERCHANT} characters or fewer.`;
   }
 
-  const category = type === 'income' ? INCOME_CATEGORY : trimString(source.category) || 'other';
+  const category = type === 'income'
+    ? INCOME_CATEGORY
+    : type === 'transfer'
+      ? 'other'
+      : trimString(source.category) || 'other';
   if (type === 'expense' && !CATEGORY_KEYS.includes(category)) {
     errors.category = 'Category is not recognized.';
   }
@@ -796,16 +816,31 @@ export function validateExpenseInput(input) {
     if (Number.isInteger(rawId) && rawId > 0) paymentMethodId = rawId;
     else errors.paymentMethodId = 'Payment method is not valid.';
   }
+  if (type === 'transfer' && paymentMethodId === null) {
+    errors.paymentMethodId = 'Choose the account the money leaves.';
+  }
+
+  let toPaymentMethodId = null;
+  if (type === 'transfer') {
+    const rawTarget = source.toPaymentMethodId;
+    const target = typeof rawTarget === 'string' ? Number(rawTarget) : rawTarget;
+    if (Number.isInteger(target) && target > 0) toPaymentMethodId = target;
+    else errors.toPaymentMethodId = 'Choose the account the money goes to.';
+    if (toPaymentMethodId !== null && toPaymentMethodId === paymentMethodId) {
+      errors.toPaymentMethodId = 'Choose two different accounts.';
+    }
+  }
 
   const id = normalizeId(source.id, errors);
 
   const data = {
     type,
     date,
-    merchant,
+    merchant: type === 'transfer' && !merchant ? 'Account transfer' : merchant,
     category,
     amountCents: Number.isInteger(rawAmount) && rawAmount > 0 ? rawAmount : 0,
     paymentMethodId,
+    toPaymentMethodId,
     notes,
   };
   if (id) data.id = id;
@@ -830,12 +865,29 @@ export async function saveExpense(db, input) {
     const method = await db.get('paymentMethods', data.paymentMethodId);
     if (!method) errors.paymentMethodId = 'Payment method not found.';
   }
+  if (!errors.toPaymentMethodId && data.toPaymentMethodId !== null) {
+    const target = await db.get('paymentMethods', data.toPaymentMethodId);
+    if (!target) errors.toPaymentMethodId = 'Destination account not found.';
+  }
 
   throwIfErrors(errors);
 
   const now = new Date().toISOString();
   const id = data.id || 0;
   const existing = id ? await db.get('transactions', id) : undefined;
+  if (data.type === 'transfer') {
+    const rows = (await db.getAll('transactions')).filter(
+      (transaction) => !id || Number(transaction.id) !== id
+    );
+    const source = await db.get('paymentMethods', data.paymentMethodId);
+    if (source) {
+      const available = methodBalance(source, rows, data.date);
+      if (data.amountCents > available) {
+        throw new Error('That is more than the available balance on the source account.');
+      }
+    }
+  }
+
   const record = {
     ...data,
     goalId: null,
@@ -845,6 +897,7 @@ export async function saveExpense(db, input) {
     updatedAt: now,
   };
   if (id) record.id = id;
+  if (record.type !== 'transfer') record.toPaymentMethodId = null;
   const key = await db.put('transactions', record);
   if (!id) record.id = key;
   return record;

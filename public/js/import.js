@@ -56,21 +56,39 @@ function renewlyBackupRows(data, options) {
 		])
 	);
 	const rows = (Array.isArray(data.transactions) ? data.transactions : [])
-		.filter((transaction) => transaction && (transaction.type === 'expense' || transaction.type === 'income'))
+		.filter(
+			(transaction) =>
+				transaction &&
+				['expense', 'income', 'transfer'].includes(transaction.type)
+		)
 		.map((transaction) => {
-			const type = transaction.type === 'income' ? 'income' : 'expense';
+			const type = transaction.type === 'income'
+				? 'income'
+				: transaction.type === 'transfer'
+					? 'transfer'
+					: 'expense';
 			const methodText = methodNames.get(String(transaction.paymentMethodId ?? '')) || '';
 			const paymentMethodId = matchMethod(methodText, options.methods) ?? options.defaultMethodId ?? null;
+			const targetText = methodNames.get(String(transaction.toPaymentMethodId ?? '')) || '';
+			const transferMethodId =
+				type === 'transfer' ? matchMethod(targetText, options.methods) ?? null : null;
 			return {
 				type,
 				date: transaction.date,
-				merchant: String(transaction.merchant || (type === 'income' ? 'Imported income' : 'Imported expense')).slice(0, 60),
+				merchant: String(
+					transaction.merchant ||
+						(type === 'income' ? 'Imported income' : type === 'transfer' ? 'Account transfer' : 'Imported expense')
+				).slice(0, 60),
 				amountCents: Number(transaction.amountCents) || 0,
 				category: type === 'income'
 					? INCOME_CATEGORY
-					: mapCategory(transaction.category) || detectCategory(transaction.merchant || '') || 'other',
+					: type === 'transfer'
+						? 'other'
+						: mapCategory(transaction.category) || detectCategory(transaction.merchant || '') || 'other',
 				notes: String(transaction.notes || '').slice(0, 500),
 				paymentMethodId,
+				transferMethodId,
+				direction: type === 'transfer' ? 'out' : null,
 				methodLabel: options.methods.find((method) => method.id === paymentMethodId)?.label || '',
 				source: 'Renewly JSON import',
 			};
@@ -118,8 +136,13 @@ function readJson(text, options) {
 				duplicates: finalized.duplicates,
 				expenseCount: valid.filter((row) => row.type === 'expense').length,
 				incomeCount: valid.filter((row) => row.type === 'income').length,
+				transferCount: valid.filter((row) => row.type === 'transfer').length,
 				expenseCents: valid.filter((row) => row.type === 'expense').reduce((sum, row) => sum + row.amountCents, 0),
 				incomeCents: valid.filter((row) => row.type === 'income').reduce((sum, row) => sum + row.amountCents, 0),
+				transferCents: valid.filter((row) => row.type === 'transfer').reduce((sum, row) => sum + row.amountCents, 0),
+				transfersMissingAccount: valid.filter(
+					(row) => row.type === 'transfer' && row.transferMethodId === null
+				).length,
 			},
 			warnings: [],
 		};
@@ -142,14 +165,20 @@ function readJson(text, options) {
 function analyze(rows) {
 	const valid = rows
 		.filter((row) => !row.duplicate)
-		.map((row) => ({ ...row, type: row.type === 'income' ? 'income' : 'expense' }));
+		.map((row) => ({
+			...row,
+			type: row.type === 'income' ? 'income' : row.type === 'transfer' ? 'transfer' : 'expense',
+		}));
 	if (!valid.length) {
 		return {
 			count: 0,
 			expenseCount: 0,
 			incomeCount: 0,
+			transferCount: 0,
 			expenseCents: 0,
 			incomeCents: 0,
+			transferCents: 0,
+			transfersMissingAccount: 0,
 			netCents: 0,
 			categories: [],
 			from: null,
@@ -162,8 +191,15 @@ function analyze(rows) {
 		count: valid.length,
 		expenseCount: summary.count,
 		incomeCount: valid.filter((row) => row.type === 'income').length,
+		transferCount: valid.filter((row) => row.type === 'transfer').length,
 		expenseCents: summary.expenseCents,
 		incomeCents: summary.incomeCents,
+		transferCents: valid
+			.filter((row) => row.type === 'transfer')
+			.reduce((sum, row) => sum + row.amountCents, 0),
+		transfersMissingAccount: valid.filter(
+			(row) => row.type === 'transfer' && row.transferMethodId === null
+		).length,
 		netCents: summary.netCents,
 		categories: summary.categories.slice(0, 4),
 		from: dates[0],
@@ -178,6 +214,11 @@ function warningsFor(stats, extra = []) {
 	}
 	if (stats.duplicates) {
 		warnings.push(`${stats.duplicates} row${stats.duplicates === 1 ? '' : 's'} already exist and are excluded by default.`);
+	}
+	if (stats.transfersMissingAccount) {
+		warnings.push(
+			`${stats.transfersMissingAccount} transfer row${stats.transfersMissingAccount === 1 ? '' : 's'} needs the other account selected before ${stats.transfersMissingAccount === 1 ? 'it' : 'they'} can be imported.`
+		);
 	}
 	return warnings;
 }
@@ -234,8 +275,13 @@ export async function parseImportFile(file, options = {}) {
 		duplicates: 0,
 		expenseCount: rows.filter((row) => row.type === 'expense').length,
 		incomeCount: rows.filter((row) => row.type === 'income').length,
+		transferCount: rows.filter((row) => row.type === 'transfer').length,
 		expenseCents: rows.filter((row) => row.type === 'expense').reduce((sum, row) => sum + row.amountCents, 0),
 		incomeCents: rows.filter((row) => row.type === 'income').reduce((sum, row) => sum + row.amountCents, 0),
+		transferCents: rows.filter((row) => row.type === 'transfer').reduce((sum, row) => sum + row.amountCents, 0),
+		transfersMissingAccount: rows.filter(
+			(row) => row.type === 'transfer' && row.transferMethodId === null
+		).length,
 	};
 	return {
 		fileName: name,
@@ -251,26 +297,50 @@ export async function importRows(db, rows, options = {}) {
 	const { defaultMethodId = null, existing = [] } = options;
 	const keys = new Set(
 		(existing || [])
-			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
+			.filter((row) => row && ['expense', 'income', 'transfer'].includes(row.type))
 			.map((row) =>
 				duplicateKey(
 					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
-					row.paymentMethodId ?? null
+					row.paymentMethodId ?? null,
+					row.toPaymentMethodId ?? null
 				)
 			)
 	);
 	let imported = 0;
 	let importedExpense = 0;
 	let importedIncome = 0;
+	let importedTransfer = 0;
 	let skipped = 0;
 	let failed = 0;
+	let needsAccount = 0;
 	for (const row of rows || []) {
 		if (row.duplicate) {
 			skipped += 1;
 			continue;
 		}
-		const paymentMethodId = row.paymentMethodId ?? defaultMethodId ?? null;
-		const key = duplicateKey(row, paymentMethodId);
+		const statementMethodId = row.paymentMethodId ?? defaultMethodId ?? null;
+		let paymentMethodId = statementMethodId;
+		let toPaymentMethodId = null;
+		let key = duplicateKey(row, statementMethodId);
+		if (row.type === 'transfer') {
+			const otherMethodId = row.transferMethodId ?? null;
+			if (
+				statementMethodId === null ||
+				otherMethodId === null ||
+				String(statementMethodId) === String(otherMethodId)
+			) {
+				needsAccount += 1;
+				continue;
+			}
+			if (row.direction === 'in') {
+				paymentMethodId = otherMethodId;
+				toPaymentMethodId = statementMethodId;
+			} else {
+				paymentMethodId = statementMethodId;
+				toPaymentMethodId = otherMethodId;
+			}
+			key = duplicateKey(row, paymentMethodId, toPaymentMethodId);
+		}
 		if (keys.has(key)) {
 			skipped += 1;
 			continue;
@@ -283,28 +353,40 @@ export async function importRows(db, rows, options = {}) {
 				category: row.category,
 				amountCents: row.amountCents,
 				paymentMethodId,
+				toPaymentMethodId,
 				notes: row.notes || '',
 			});
 			keys.add(key);
 			imported += 1;
 			if (row.type === 'income') importedIncome += 1;
+			else if (row.type === 'transfer') importedTransfer += 1;
 			else importedExpense += 1;
 		} catch {
 			failed += 1;
 		}
 	}
-	return { imported, importedExpense, importedIncome, skipped, failed };
+	return {
+		imported,
+		importedExpense,
+		importedIncome,
+		importedTransfer,
+		skipped,
+		failed,
+		needsAccount,
+	};
 }
 
 export function recategorizeRows(rows) {
 	return (rows || []).map((row) => {
-		const type = row.type === 'income' ? 'income' : 'expense';
+		const type = row.type === 'income' ? 'income' : row.type === 'transfer' ? 'transfer' : 'expense';
 		return {
 			...row,
 			type,
 			category: type === 'income'
 				? INCOME_CATEGORY
-				: detectCategory(`${row.merchant} ${row.notes || ''}`) || row.category || 'other',
+				: type === 'transfer'
+					? 'other'
+					: detectCategory(`${row.merchant} ${row.notes || ''}`) || row.category || 'other',
 		};
 	});
 }

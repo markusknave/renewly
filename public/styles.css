@@ -1081,6 +1081,10 @@ hr {
   color: var(--ok);
 }
 
+.activity-amount.move {
+  color: var(--brand);
+}
+
 .cat-badge {
   display: inline-grid;
   place-items: center;
@@ -1446,6 +1450,11 @@ hr {
 
 .txn-amount.in {
   color: var(--ok);
+}
+
+.txn-amount.move,
+.activity-amount.move {
+  color: var(--brand);
 }
 
 .txn-actions {
@@ -2197,6 +2206,45 @@ textarea {
 
 .dialog-head h2 {
   margin: 0;
+}
+
+.scan-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand) 5%, var(--surface));
+}
+
+.scan-row .hint,
+.scan-row [data-scan-status] {
+  flex: 1 1 180px;
+}
+
+.scan-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.scan-row [data-scan-status].is-error {
+  color: var(--danger);
+}
+
+.import-transfer-select {
+  display: block;
+  margin-top: 0.25rem;
+  min-width: 9rem;
+}
+
+.is-busy [data-scan-button] {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* --------------------------------------------------------------- toolbar */

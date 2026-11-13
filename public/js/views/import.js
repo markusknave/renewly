@@ -8,13 +8,33 @@ import { breadcrumb, esc, icon } from './shared.js';
 
 function statusPill(row) {
 	if (row.duplicate) return '<span class="pill pill-paused">Duplicate</span>';
+	if (row.type === 'transfer' && !row.transferMethodId) {
+		return '<span class="pill pill-paused">Needs account</span>';
+	}
 	return '<span class="pill pill-active">Ready</span>';
 }
 
-function previewRows(rows) {
+function transferOptions(row, methods) {
+	return `<select class="import-transfer-select" data-import-transfer data-index="${
+		row.index
+	}" aria-label="Other transfer account">
+		<option value="">Other account…</option>
+		${methods
+			.filter((method) => String(method.id) !== String(row.paymentMethodId ?? ''))
+			.map(
+				(method) =>
+					`<option value="${method.id}"${
+						String(row.transferMethodId) === String(method.id) ? ' selected' : ''
+					}>${esc(method.label)}</option>`
+			)
+			.join('')}
+	</select>`;
+}
+
+function previewRows(rows, methods) {
 	if (!rows.length) return '<p class="muted small">No transaction rows were recognized.</p>';
 	return `<div class="table-wrap"><table class="subs-table import-table">
-		<thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Category</th><th>Method</th><th>Amount</th><th>Status</th></tr></thead>
+		<thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Category</th><th>Account</th><th>Amount</th><th>Status</th></tr></thead>
 		<tbody>${rows
 			.slice(0, 100)
 			.map(
@@ -24,12 +44,17 @@ function previewRows(rows) {
 						row.notes ? `<span class="sub">${esc(row.notes.slice(0, 80))}</span>` : ''
 					}</td>
 					<td><select data-import-type data-index="${index}">
-						<option value="expense"${row.type === 'income' ? '' : ' selected'}>Expense</option>
+						<option value="expense"${row.type === 'expense' ? ' selected' : ''}>Expense</option>
 						<option value="income"${row.type === 'income' ? ' selected' : ''}>Income</option>
+						<option value="transfer"${row.type === 'transfer' ? ' selected' : ''}>Transfer</option>
 					</select></td>
 					<td>${esc(categoryLabel(row.category))}</td>
-					<td>${esc(row.methodLabel || 'Default')}</td>
-					<td class="num">${row.type === 'income' ? '+' : '−'}${esc(formatMoney(row.amountCents, 'PHP'))}</td>
+					<td>${esc(row.methodLabel || 'Default')}${
+						row.type === 'transfer' ? transferOptions({ ...row, index }, methods) : ''
+					}</td>
+					<td class="num">${
+						row.type === 'income' ? '+' : row.type === 'transfer' ? '⇄ ' : '−'
+					}${esc(formatMoney(row.amountCents, 'PHP'))}</td>
 					<td>${statusPill(row)}</td>
 				</tr>`
 			)
@@ -46,6 +71,9 @@ function analysisPanel(analysis) {
 		<div><span class="muted small">Income</span><strong>${analysis.incomeCount} · ${esc(
 			formatMoney(analysis.incomeCents, 'PHP')
 		)}</strong></div>
+		<div><span class="muted small">Transfers</span><strong>${analysis.transferCount || 0} · ${esc(
+			formatMoney(analysis.transferCents || 0, 'PHP')
+		)}</strong></div>
 		<div><span class="muted small">Net</span><strong>${esc(formatMoney(analysis.netCents, 'PHP'))}</strong></div>
 		<div><span class="muted small">Range</span><strong class="small-value">${esc(
 			formatDateHuman(analysis.from)
@@ -60,7 +88,11 @@ function analysisPanel(analysis) {
 
 export function importView({ methods = [], preview = null, busy = false, defaultMethodId = null }) {
 	const rows = preview?.rows || [];
-	const ready = rows.filter((row) => !row.duplicate).length;
+	const ready = rows.filter(
+		(row) =>
+			!row.duplicate &&
+			!(row.type === 'transfer' && (!row.transferMethodId || !row.paymentMethodId))
+	).length;
 	const duplicateCount = rows.filter((row) => row.duplicate).length;
 	const stats = preview?.stats || null;
 
@@ -69,7 +101,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 		<div>
 			<p class="eyebrow">More · Import</p>
 			<h1>Import transactions</h1>
-			<p class="muted">Read a statement, preview what Renewly understood, then add expenses and income. Everything stays on this device.</p>
+			<p class="muted">Read a statement, preview what Renewly understood, then add expenses, income, and transfers. Everything stays on this device.</p>
 		</div>
 		<div class="page-head-actions"><a class="btn" href="#/expenses">Back to expenses</a></div>
 	</div>
@@ -98,6 +130,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 					<div><span class="muted small">Ready</span><strong>${ready}</strong></div>
 					<div><span class="muted small">Expenses</span><strong>${stats?.expenseCount ?? 0}</strong></div>
 					<div><span class="muted small">Income</span><strong>${stats?.incomeCount ?? 0}</strong></div>
+					<div><span class="muted small">Transfers</span><strong>${stats?.transferCount ?? 0}</strong></div>
 					<div><span class="muted small">Duplicates</span><strong>${duplicateCount}</strong></div>
 				</section>
 				${analysisPanel(preview.analysis)}
@@ -128,8 +161,8 @@ export function importView({ methods = [], preview = null, busy = false, default
 							<button class="btn" type="button" data-action="clear-import">Clear</button>
 						</div>
 					</div>
-					<p class="hint">The analyst matched categories from the description and notes. Use the Type column to correct a row before importing; you can also edit any imported transaction afterward.</p>
-					${previewRows(rows)}
+					<p class="hint">The analyst matched categories from the description and notes. Use the Type column to correct a row before importing; transfers need the other account selected in the Account column. You can also edit any imported transaction afterward.</p>
+					${previewRows(rows, methods)}
 					${
 						rows.length > 100
 							? `<p class="muted tiny">Showing the first 100 of ${rows.length} rows. All ready rows will be imported.</p>`
@@ -147,6 +180,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 				<ul class="tight">
 					<li>Dates are read from ISO, local, month-name, epoch, and Excel serial formats.</li>
 					<li>Debit, withdrawal, and expense rows become expenses; credit, deposit, salary, and income rows become income.</li>
+					<li>Transfer, InstaPay, PESONet, and "sent to"/"received from" rows become transfers. Pick the other account in the preview when it is not named in the statement.</li>
 					<li>Categories come from the file when present, otherwise the local analyst's keywords infer them.</li>
 					<li>Account or card names are matched to your saved payment methods; unmatched rows use the default you pick.</li>
 					<li>Rows already in the ledger are marked as duplicates and excluded.</li>

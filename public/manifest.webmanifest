@@ -40,6 +40,12 @@
       "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
     },
     {
+      "name": "Transfer money",
+      "short_name": "Transfer",
+      "url": "./#/expenses?new=transfer",
+      "icons": [{ "src": "./icons/app-192.png", "sizes": "192x192" }]
+    },
+    {
       "name": "Import expenses",
       "short_name": "Import",
       "url": "./#/import",

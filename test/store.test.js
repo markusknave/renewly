@@ -333,7 +333,7 @@ test('saveExpense stores expenses and income separately', async () => {
 
   await assert.rejects(
     () => saveExpense(db, { type: 'refund', date: '2026-11-13', merchant: 'Bad', amountCents: 1 }),
-    /Type must be expense or income/
+    /Type must be expense, income, or transfer/
   );
 });
 

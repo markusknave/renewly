@@ -9,6 +9,7 @@ import { inRange, sortTransactions, transactionSignedCents } from './finance.js'
 const TYPE_LABELS = {
 	expense: 'Expense',
 	income: 'Income',
+	transfer: 'Transfer',
 	interest: 'Interest',
 	goal_deposit: 'Goal transfer',
 	goal_withdrawal: 'Goal transfer',
@@ -34,6 +35,12 @@ function descriptionFor(transaction, methods, goals) {
 	if (transaction.type === 'interest') {
 		return `Interest earned · ${methodName(methods, transaction.paymentMethodId)}`;
 	}
+	if (transaction.type === 'transfer') {
+		return `${methodName(methods, transaction.paymentMethodId)} → ${methodName(
+			methods,
+			transaction.toPaymentMethodId
+		)}`;
+	}
 	if (transaction.type === 'goal_deposit') {
 		return `Transfer to ${goalName(goals, transaction.goalId)}`;
 	}
@@ -49,13 +56,22 @@ export function buildReport({ transactions, methods, goals, from, to, today, gen
 			inRange(transaction, from, to)
 		)
 	).map((transaction) => {
-		const signed = transactionSignedCents(transaction);
+		const signed =
+			transaction.type === 'transfer'
+				? Math.max(0, Number(transaction.amountCents) || 0)
+				: transactionSignedCents(transaction);
 		return {
 			date: transaction.date,
 			description: descriptionFor(transaction, methods, goals),
 			category: transaction.type === 'expense' ? categoryLabel(transaction.category) : TYPE_LABELS[transaction.type] || 'Entry',
 			type: TYPE_LABELS[transaction.type] || 'Entry',
-			method: methodName(methods, transaction.paymentMethodId),
+			method:
+				transaction.type === 'transfer'
+					? `${methodName(methods, transaction.paymentMethodId)} → ${methodName(
+							methods,
+							transaction.toPaymentMethodId
+						)}`
+					: methodName(methods, transaction.paymentMethodId),
 			amountCents: signed,
 			notes: transaction.notes || '',
 		};

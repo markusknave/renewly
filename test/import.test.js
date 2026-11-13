@@ -251,9 +251,25 @@ test('importRows commits expenses and income and skips duplicates', async () => 
 		{ type: 'income', date: '2026-11-02', merchant: 'Salary', amountCents: 50_000, category: 'income', notes: '', paymentMethodId: account.id },
 	];
 	const first = await importRows(db, rows, { existing: [] });
-	assert.deepEqual(first, { imported: 2, importedExpense: 1, importedIncome: 1, skipped: 1, failed: 0 });
+	assert.deepEqual(first, {
+		imported: 2,
+		importedExpense: 1,
+		importedIncome: 1,
+		importedTransfer: 0,
+		skipped: 1,
+		failed: 0,
+		needsAccount: 0,
+	});
 	const second = await importRows(db, rows, { existing: await listTransactions(db) });
-	assert.deepEqual(second, { imported: 0, importedExpense: 0, importedIncome: 0, skipped: 3, failed: 0 });
+	assert.deepEqual(second, {
+		imported: 0,
+		importedExpense: 0,
+		importedIncome: 0,
+		importedTransfer: 0,
+		skipped: 3,
+		failed: 0,
+		needsAccount: 0,
+	});
 	const transactions = await listTransactions(db);
 	assert.equal(transactions.length, 2);
 	assert.equal(transactions.find((row) => row.type === 'expense').amountCents, 12_550);
