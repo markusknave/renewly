@@ -43,15 +43,6 @@ Excel / PDF reports, and a strictly offline analyst.
 - JSON backups from beta-0.1 through beta-0.3 still import. New backups use
   format version 4 and include ledger entries, goals, card balances, and rates.
 
-## Verification
-
-- `npm test` covers finance math (balances, daily/monthly compounding,
-  idempotent accrual, goals), report writers, the local analyst and chat, backup
-  round-trips, store validation, and view rendering.
-- Browser smoke tests cover adding a card with interest, logging expenses,
-  creating and funding a goal, asking the chat, JSON export/import, and
-  downloading CSV, Excel, and PDF files.
-
 ## Known limits
 
 - Interest is gross of the 20% final tax on Philippine deposit interest and does

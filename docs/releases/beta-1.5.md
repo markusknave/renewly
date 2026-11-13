@@ -55,19 +55,6 @@ schema version 3, so no uninstall or backup restore is required. Existing
 `bank` payment methods keep working and now display as **Bank account**. JSON
 backup format 5 still imports and now accepts `credit` payment kinds.
 
-## Verification
-
-- `npm test`: 124 tests passing, including credit provider inference, searchable
-  select markup, transfer math, import account creation, backups, and reports.
-- `npm run test:coverage`: coverage thresholds pass.
-- `npm run security:check` and `npm run security:audit`: clean.
-- Browser smoke: searched and added Atome as a credit account; transferred bank
-  to e-wallet and back; filtered the ledger through the searchable method
-  picker; previewed and imported missing BillEase and GCash accounts; confirmed
-  scan autofill updates the searchable account pickers; no console errors.
-- GitHub Actions: test, security, Android, and CodeQL checks must pass before
-  merge; the release tag builds and verifies the signed APK.
-
 ## Install
 
 Download `renewly-beta-1.5.apk`, tap it on the phone, and allow **Install unknown

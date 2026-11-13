@@ -45,7 +45,7 @@ e-wallet choices, and expands the plan catalog.
 
 - The free-text label is replaced by **Bank / E-wallet** lists for the selected
   type:
-  - **Card** and **Bank transfer** list Philippine banks (BDO, BPI, Metrobank,
+  - **Card** and **Bank account** list Philippine banks (BDO, BPI, Metrobank,
     Landbank, UnionBank, Security Bank, RCBC, Chinabank, EastWest, HSBC,
     Citibank, Maybank, PNB, PSBank, AUB, CIMB, Maya Bank, GoTyme, SeaBank,
     Tonik, Komo, DiskarTech, and more).
@@ -85,8 +85,7 @@ source links:
 | MUBI | ₱399/month, ₱3,588/year, ₱299/month student | mubi.com/en/ph |
 | Strava | ₱1,500/year, ₱4,499/year family, ₱750/year student | strava.com/subscribe |
 
-Each plan has a matching entry in `scripts/plans.sources.json` so
-`npm run plans:refresh -- --dry-run` checks it for drift.
+Each plan has a matching entry in `scripts/plans.sources.json` with its source.
 
 ## Interface
 

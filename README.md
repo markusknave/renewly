@@ -6,12 +6,32 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-1.4](https://github.com/markusknave/renewly/releases/tag/beta-1.4),
+[beta-1.5](https://github.com/markusknave/renewly/releases/tag/beta-1.5),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-1.4.apk
+renewly-beta-1.5.apk
 ```
+
+## What is new in beta-1.5
+
+- **Searchable account pickers.** Bank, wallet, credit, platform, plan, and
+  time-zone dropdowns open a search field. Type part of a name, such as `bpi`,
+  `maya`, or `atome`, and pick the filtered match.
+- **Credit / BNPL accounts.** A new payment type covers Atome, BillEase, Home
+  Credit, Salmon, Tala, Cashalo, Akulaku, JuanHand, UnaCash, Maya Credit, GLoan,
+  SPayLater, and LazPayLater.
+- **More Philippine banks.** Added PBCom, Philtrust, CTBC, Bank of China
+  (Manila), MUFG Manila, Philippine Veterans Bank, Producers Bank, First
+  Consolidated Bank, and Al-Amanah.
+- **Any account pair can transfer.** The payment-method type is now **Bank
+  account**, and transfers can move money from a bank to an e-wallet, an
+  e-wallet to a bank, or between two accounts of the same type.
+- **Automatic accounts from imports.** When a statement names a card or wallet
+  that is not saved, the preview offers to create it with an inferred type and
+  assigns the imported rows to it.
+- **Reports the created accounts.** The import result names new accounts, for
+  example `Imported 3 expenses and created BillEase, GCash`.
 
 ## What is new in beta-1.4
 
@@ -50,8 +70,8 @@ renewly-beta-1.4.apk
 ## What is new in beta-1.2-hotfix
 
 - **Signing key rotation.** The old beta key was committed to this public
-  repository. It is removed, retired, and replaced with a key stored only in
-  GitHub Actions secrets. New APKs are signed only from tag builds.
+  repository. It is removed, retired, and replaced with a key stored in release
+  secrets. New APKs are signed only from tag builds.
 - **One-time reinstall required.** Android will not accept this APK as an
   in-place update of beta-1.2 or older. Export a JSON backup, uninstall once,
   install this APK, then restore the backup. See **Updating from beta-1.2 or
@@ -62,9 +82,6 @@ renewly-beta-1.4.apk
 - **Import parser limits.** Files are capped at 25 MB, SQLite record headers and
   overflow chains are bounded, and ZIP/PDF decompression has byte and stream
   limits. A crafted statement can no longer wedge the app.
-- **Automation and security gates.** Vitest with coverage thresholds, a local
-  pre-commit check, GitHub CI for tests, npm audit, gitleaks, actionlint, Trivy,
-  and CodeQL. Release tags build a signed APK only after the gates pass.
 
 ## What is new in beta-1.2
 
@@ -254,18 +271,24 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-1.4.apk
+adb install -r renewly-beta-1.5.apk
 ```
+
+### Updating from beta-1.4
+
+Install beta-1.5 over beta-1.4. It uses the same signing key and the same
+IndexedDB schema version 3, so no uninstall or backup restore is required. JSON
+backup format 5 still imports and now accepts Credit / BNPL accounts.
 
 ### Updating from beta-1.3
 
-Install beta-1.4 over beta-1.3. It uses the same signing key and the same
+Install beta-1.5 over beta-1.3. It uses the same signing key and the same
 IndexedDB schema version 3, so no uninstall or backup restore is required. The
-JSON backup format moves to version 5; beta-1.4 imports versions 1 through 5.
+JSON backup format moves to version 5; beta-1.5 imports versions 1 through 5.
 
 ### Updating from beta-1.2-hotfix
 
-Install beta-1.4 over beta-1.2-hotfix. It uses the same rotated signing key and
+Install beta-1.5 over beta-1.2-hotfix. It uses the same rotated signing key and
 the same IndexedDB schema, so no uninstall or backup restore is required.
 
 ### Updating from beta-1.2 or earlier
@@ -276,7 +299,7 @@ different signer, so it will reject an in-place update with
 
 1. Export a JSON backup from **More → Settings**.
 2. Uninstall Renewly once.
-3. Install `renewly-beta-1.4.apk`.
+3. Install `renewly-beta-1.5.apk`.
 4. Restore the JSON backup.
 
 The new certificate SHA-256 fingerprint is:
@@ -288,19 +311,19 @@ The new certificate SHA-256 fingerprint is:
 Verify it with:
 
 ```bash
-apksigner verify --print-certs renewly-beta-1.4.apk
+apksigner verify --print-certs renewly-beta-1.5.apk
 ```
 
 ### Updating from beta-1.1
 
-Installing beta-1.4 over beta-1.1 keeps the IndexedDB database, but the
+Installing beta-1.5 over beta-1.1 keeps the IndexedDB database, but the
 signing key changed. Follow the one-time reinstall steps above. There is no
 schema change; the import feature only adds rows through the existing expense
 store.
 
 ### Updating from beta-0.3
 
-Installing beta-1.4 over beta-0.3 keeps the IndexedDB database, but the
+Installing beta-1.5 over beta-0.3 keeps the IndexedDB database, but the
 signing key changed, so follow the one-time reinstall steps above. The schema
 moves from version 2 to version 3, which only adds the `transactions` and
 `goals` stores; existing subscriptions, groups, payment methods, and settings
@@ -308,18 +331,15 @@ are left alone.
 
 ### Updating from beta-0.1 or beta-0.2
 
-beta-0.2 through beta-1.2 used the retired beta key. beta-0.1 CI builds used a
+beta-0.2 through beta-1.2 used the retired beta key. beta-0.1 builds used a
 runner-generated debug key. If Android rejects the install with a signature
 mismatch, export your data first, uninstall once, then install
-beta-1.4 and import the JSON backup.
+beta-1.5 and import the JSON backup.
 
 ## Run it locally
 
 ```bash
 npm run serve          # http://127.0.0.1:8080
-npm test               # Vitest suites
-npm run test:coverage  # Vitest with V8 coverage thresholds
-npm run verify         # tests + local security gate (also runs pre-commit)
 ```
 
 To test from a phone on the same network:
@@ -353,10 +373,6 @@ The debug APK is written to
 `android/app/build/outputs/apk/debug/app-debug.apk`. Install it with
 `adb install -r <apk>`, or copy it to the phone and tap it.
 
-The GitHub Actions `CI` workflow builds an unsigned debug APK on every pull
-request and runs tests plus security scans. The `Release` workflow runs only for
-a `beta-*` tag, decodes the signing key from repository secrets, builds a signed
-release APK, verifies it with `apksigner`, and publishes the APK and checksum.
 See [docs/ANDROID.md](docs/ANDROID.md) for SDK setup and troubleshooting.
 
 ## Data and privacy
@@ -420,33 +436,6 @@ npm run plans:refresh -- --fx        # refresh the USD→PHP rate
 npm run plans:refresh -- --write     # record fetched fingerprints
 ```
 
-## Security and CI
-
-- **Local gate.** `npm run verify` runs the Vitest suite and
-  `scripts/security-check.mjs`. Husky runs it from `.husky/pre-commit` before
-  every commit. The check rejects tracked keystores, literal signing passwords,
-  private-key blocks, and dangerous workflow triggers (`pull_request_target`,
-  `workflow_run`, `write-all`).
-- **Pull-request CI.** `.github/workflows/ci.yml` runs tests with coverage,
-  `npm audit --audit-level=high`, gitleaks on the current tree, actionlint, and
-  Trivy (vulnerabilities, secrets, misconfiguration). The Android job builds an
-  unsigned debug APK without access to release secrets and uploads no APK.
-- **Code scanning.** CodeQL analyzes JavaScript/TypeScript on pull requests,
-  main, and a weekly schedule. Dependency review blocks high-severity additions
-  on pull requests.
-- **Release gate.** `.github/workflows/release.yml` runs only for `beta-*` tags.
-  It repeats the tests and security checks, decodes the PKCS12 key from
-  `RENEWLY_KEYSTORE_BASE64`, builds `assembleRelease`, verifies the certificate
-  with `apksigner`, writes a SHA-256 checksum, and publishes the APK.
-- **Branch protection.** `main` requires a pull request and the `test`,
-  `security`, and `android` status checks. Direct pushes and force pushes are
-  blocked.
-
-The old signing key was published in this repository and is compromised. It has
-been retired and removed from the working tree; the new key exists only in
-GitHub Actions secrets. The old key still exists in git history, which is why
-the one-time reinstall migration is mandatory for users on older builds.
-
 ## Limits
 
 - No email, bank, or Plaid ingestion by design. Balances are only as accurate as
@@ -471,9 +460,6 @@ the one-time reinstall migration is mandatory for users on older builds.
 - The web app needs a modern browser with IndexedDB and, for Excel export,
   `CompressionStream`; without it the workbook is written uncompressed and still
   opens.
-- The beta signing key lives in GitHub Actions secrets and is used only for
-  `beta-*` tag builds. Pull-request CI never receives it. Use Play App Signing
-  or a separate production key before publishing to a store.
 
 ## Project layout
 
@@ -481,7 +467,7 @@ the one-time reinstall migration is mandatory for users on older builds.
 public/
   index.html             app shell, bottom nav, floating add button
   js/app.js              router, actions, dialogs, imports/exports, reminders
-  js/db.js               IndexedDB backend (v3) + in-memory backend for tests
+  js/db.js               IndexedDB backend (v3)
   js/store.js            validation, CRUD, groups, settings, subscriptions
   js/finance.js          balances, interest accrual, goals, periods
   js/insights.js         local analyst, forecasts, offline chat
@@ -512,10 +498,5 @@ scripts/
   refresh-plans.mjs      catalog refresh/drift report
   plans.sources.json     catalog sources
   generate-icons.mjs     icon generator
-  security-check.mjs     local signing-material and workflow gate
 android/                 Capacitor Android project (includes QuickAddWidget)
-test/                    Vitest suites
-vitest.config.js         Vitest and coverage thresholds
-.husky/pre-commit        runs npm run verify before each commit
-.github/workflows/       CI, CodeQL, and signed release
 ```

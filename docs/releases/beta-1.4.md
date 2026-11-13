@@ -66,18 +66,6 @@ Users still on beta-1.2 or older must follow the beta-1.2-hotfix one-time
 export/uninstall/install/restore migration because that release rotated the
 signing key.
 
-## Verification
-
-- `npm test`: 119 tests passing, including transfer math, statement import,
-  backup round-trip, report output, and receipt/payslip/transfer parsing.
-- `npm run test:coverage`: coverage thresholds pass.
-- Browser smoke: transfer entry and both balances, CSV transfer preview and
-  commit, synthetic receipt scan autofilling date, merchant, total, and
-  category, and source/account matching.
-- `npm run security:check` and `npm run security:audit`: clean.
-- GitHub Actions: test, security, Android, and CodeQL checks must pass before
-  merge; the release tag builds and verifies the signed APK.
-
 ## Install
 
 Download `renewly-beta-1.4.apk`, tap it on the phone, and allow **Install unknown

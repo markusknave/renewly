@@ -35,7 +35,7 @@ and an in-place upgrade path that keeps your data.
   store; existing subscriptions, payment methods, and settings are untouched.
 - Every beta-0.2+ APK is signed with the same bundled beta key, so Android
   installs updates in place instead of requiring an uninstall.
-- **If you installed beta-0.1:** that CI build used a runner-generated debug key.
+- **If you installed beta-0.1:** that build used a runner-generated debug key.
   If Android rejects beta-0.2 with a signature mismatch, export your JSON (if the
   app still opens), uninstall beta-0.1 once, install beta-0.2, and import the
   backup. This one-time step is not needed for later beta updates.
@@ -43,7 +43,7 @@ and an in-place upgrade path that keeps your data.
 ## Capitalization
 
 - Payment-method type dropdowns now show **Card**, **E-wallet**, **Bank
-  transfer**, **Cash**, and **Other** instead of raw lowercase values.
+  account**, **Cash**, and **Other** instead of raw lowercase values.
 - Catalog category selectors use proper labels, and method types shown on
   subscription rows are capitalized.
 
@@ -61,8 +61,7 @@ Download `renewly-beta-0.2.apk` below and install it, or use:
 adb install -r renewly-beta-0.2.apk
 ```
 
-The APK is beta-signed and built by the `Build Android APK` workflow. Verify the
-signer with:
+The APK is beta-signed. Verify the signer with:
 
 ```bash
 apksigner verify --print-certs renewly-beta-0.2.apk

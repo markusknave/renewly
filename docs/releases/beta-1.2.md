@@ -34,17 +34,6 @@ and an Android home-screen quick-add widget.
 Installing beta-1.2 over beta-1.1 keeps the IndexedDB database. There is no
 schema change. JSON backups from earlier betas still import.
 
-## Verification
-
-- `npm test` covers CSV, XLSX, PDF, JSON, and MMBAK parsing, duplicate-safe
-  import commits, analyst recategorization, breadcrumbs, the SeaBank→MariBank
-  rename, and the Android widget manifest/layout.
-- GitHub Actions runs the full test suite and builds the APK on the pull request
-  before the release tag is created.
-- Browser smoke tests cover importing a CSV, reviewing the analyst summary,
-  committing the rows, duplicate re-import, breadcrumb navigation, and the
-  `#/expenses?new=1` widget route.
-
 ## Install
 
 Download `renewly-beta-1.2.apk`, tap it on the phone, and allow **Install unknown
