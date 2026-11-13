@@ -4,7 +4,7 @@
 
 import { readZip } from './xlsx.js';
 import { detectCategory, INCOME_CATEGORY } from '../lib/categories.js';
-import { matchMethod, parseAnyDate, parseMoney, mapCategory, duplicateKey } from './table.js';
+import { matchMethod, missingMethodLabel, parseAnyDate, parseMoney, mapCategory, duplicateKey } from './table.js';
 
 const textDecoder = new TextDecoder('utf-8');
 const utf16le = new TextDecoder('utf-16le');
@@ -404,7 +404,9 @@ export async function readMmbak(bytes, options = {}) {
 		const category = kind === 'income'
 			? INCOME_CATEGORY
 			: mapCategory(categoryText) || detectCategory(`${merchant} ${memo}`) || 'other';
-		const paymentMethodId = matchMethod(assetText, methods) ?? defaultMethodId ?? null;
+		const matchedMethodId = matchMethod(assetText, methods);
+		const missingMethod = missingMethodLabel(assetText, matchedMethodId);
+		const paymentMethodId = matchedMethodId ?? (assetText ? null : defaultMethodId ?? null);
 		const transaction = {
 			type: kind,
 			date,
@@ -413,7 +415,11 @@ export async function readMmbak(bytes, options = {}) {
 			category,
 			notes: memo.slice(0, 500),
 			paymentMethodId,
-			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
+			methodLabel:
+				methods.find((method) => method.id === paymentMethodId)?.label ||
+				missingMethod ||
+				(assetText ? '' : methods.find((method) => method.id === defaultMethodId)?.label || ''),
+			missingMethod,
 			source: 'Money Manager import',
 		};
 		if (kind === 'income') {

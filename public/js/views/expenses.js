@@ -149,14 +149,14 @@ export function expenseDialog({ methods = [], today }) {
 					Object.fromEntries(EXPENSE_CATEGORIES.map((category) => [category.key, category.label]))
 				)}</select></label>
 				<label><span data-payment-method-label>Payment method</span>
-					<select name="paymentMethodId">
+					<select name="paymentMethodId" data-searchable data-combo-placeholder="Search accounts…">
 						<option value="">No method</option>
 						${methodOptions}
 					</select>
 				</label>
 			</div>
 			<label data-transfer-target-field hidden>To account
-				<select name="toPaymentMethodId">
+				<select name="toPaymentMethodId" data-searchable data-combo-placeholder="Search accounts…">
 					<option value="">Choose an account</option>
 					${methodOptions}
 				</select>
@@ -219,7 +219,7 @@ export function expensesView({
 					)
 					.join('')}
 			</select></label>
-			<label>Method<select data-expense-method>
+			<label>Method<select data-expense-method data-searchable data-combo-placeholder="Search accounts…">
 				<option value="">All methods</option>
 				${methods
 					.map(

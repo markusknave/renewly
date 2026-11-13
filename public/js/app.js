@@ -378,6 +378,7 @@ async function render() {
 
 	if (token !== renderToken) return;
 	app.innerHTML = banner(flash) + body;
+	views.enhanceSelects(app);
 	if (route.name === 'catalog') filterCatalog();
 	if (route.name === 'home' || route.name === 'subscriptions') maybeNotify(subscriptionSummary, iso);
 
@@ -584,7 +585,7 @@ function syncExpenseDialogType(form) {
 	if (categoryField) categoryField.hidden = type !== 'expense';
 	if (category) category.disabled = type !== 'expense';
 	if (targetField) targetField.hidden = type !== 'transfer';
-	if (target) target.required = type === 'transfer';
+	if (target) target.required = false;
 	if (merchant) merchant.required = type !== 'transfer';
 	if (methodLabel) methodLabel.textContent = type === 'transfer' ? 'From account' : 'Payment method';
 
@@ -610,11 +611,13 @@ function syncExpenseDialogType(form) {
 	if (hint) {
 		hint.textContent =
 			type === 'transfer'
-				? 'Moves money between two saved accounts. Both balances update on the entry date.'
+				? 'Moves money between two saved accounts, including bank to e-wallet and e-wallet to bank. Both balances update on the entry date.'
 				: type === 'income'
 					? 'Saving adds the amount to the selected card or wallet.'
 					: 'Saving subtracts the amount from the selected card or wallet. Interest and goal transfers stay automatic.';
 	}
+	views.refreshSelect(source);
+	views.refreshSelect(target);
 }
 
 function resetScanUi(form) {
@@ -675,6 +678,7 @@ function openExpenseDialog(id = null, requestedType = null) {
 		form.elements.toPaymentMethodId.value = target;
 	}
 	syncExpenseDialogType(form);
+	views.refreshSelects(dialog);
 	showDialog(dialog);
 	const focus = form.elements.amount;
 	if (focus) setTimeout(() => focus.focus(), 30);
@@ -718,6 +722,7 @@ function openTransferDialog(goalId, direction = 'to_goal') {
 	form.elements.direction.value = direction;
 	form.elements.paymentMethodId.value = state.methods[0].id;
 	form.elements.date.value = todayIso();
+	views.refreshSelects(dialog);
 	showDialog(dialog);
 }
 
@@ -831,6 +836,7 @@ async function handleScanFile(file) {
 			}
 		}
 		syncExpenseDialogType(form);
+		views.refreshSelects(dialog);
 		const missing = parsed.warnings.length ? ` ${parsed.warnings.join(' ')}` : '';
 		setScanStatus(
 			dialog,
@@ -1191,6 +1197,8 @@ async function onSubmit(event) {
 			const result = await importRows(state.db, state.importPreview?.rows || [], {
 				defaultMethodId,
 				existing: state.transactions,
+				createMissingMethods: fd.get('createMissingMethods') === '1',
+				today: todayIso(),
 			});
 			const importedParts = [];
 			if (result.importedExpense) {
@@ -1201,6 +1209,11 @@ async function onSubmit(event) {
 			}
 			if (result.importedTransfer) {
 				importedParts.push(`${result.importedTransfer} transfer${result.importedTransfer === 1 ? '' : 's'}`);
+			}
+			if (result.createdMethods?.length) {
+				importedParts.push(
+					`created ${result.createdMethods.map((method) => method.label).join(', ')}`
+				);
 			}
 			state.importPreview = null;
 			state.flash = {
@@ -1545,7 +1558,12 @@ async function onChange(event) {
 	if (!form) return;
 	if (target.matches('[data-method-kind]')) {
 		const providerSelect = form.querySelector('[data-method-provider]');
-		if (providerSelect) providerSelect.innerHTML = views.providerOptions(target.value, '');
+		if (providerSelect) {
+			providerSelect.innerHTML = views.providerOptions(target.value, '');
+			views.refreshSelect(providerSelect);
+		}
+		const networkField = form.querySelector('[data-network-field]');
+		if (networkField) networkField.hidden = target.value !== 'card';
 		const customWrap = form.querySelector('[data-custom-method-label]');
 		if (customWrap) {
 			customWrap.hidden = true;
@@ -1568,6 +1586,7 @@ async function onChange(event) {
 		if (!platform) {
 			planSelect.innerHTML = '<option value="">Manual / no catalog plan</option>';
 			planSelect.disabled = true;
+			views.refreshSelect(planSelect);
 			return;
 		}
 		planSelect.disabled = false;
@@ -1581,6 +1600,7 @@ async function onChange(event) {
 						)} ${views.esc(plan.cadence)}</option>`
 				)
 				.join('');
+		views.refreshSelect(planSelect);
 		const nameInput = form.querySelector('[name="merchantName"]');
 		const planNameInput = form.querySelector('[name="planName"]');
 		const amountInput = form.querySelector('[name="amount"]');

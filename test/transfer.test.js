@@ -225,6 +225,7 @@ test('importRows commits transfers and reports rows that still need an account',
 		skipped: 0,
 		failed: 0,
 		needsAccount: 1,
+		createdMethods: [],
 	});
 	const transactions = await listTransactions(db);
 	assert.equal(transactions.length, 1);

@@ -22,7 +22,7 @@ export const EXPORT_APP = 'renewly';
 export const EXPORT_VERSION = 5;
 export const SUPPORTED_IMPORT_VERSIONS = [1, 2, 3, 4, 5];
 
-const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'cash', 'other'];
+const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'credit', 'cash', 'other'];
 const SUBSCRIPTION_KINDS = ['recurring', 'one_time'];
 const STATUSES = ['active', 'trial', 'paused', 'canceled'];
 const CADENCES = ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom'];

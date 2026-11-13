@@ -14,9 +14,12 @@ import {
 	linesToTransactions,
 	mapCategory,
 	matchMethod,
+	missingMethodLabel,
 	rowsToTransactions,
 } from './importers/table.js';
 import { detectCategory, INCOME_CATEGORY } from './lib/categories.js';
+import { inferPaymentKind } from './lib/providers.js';
+import { instrumentFor } from './lib/cardThemes.js';
 import { MAX_IMPORT_BYTES } from './importers/limits.js';
 
 export const IMPORT_ACCEPT = '.csv,.tsv,.txt,.pdf,.xlsx,.xls,.json,.mbak,.mmbak,.sqlite,.db';
@@ -48,6 +51,13 @@ function textFrom(bytes) {
 	return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
 }
 
+function methodKey(value) {
+	return String(value ?? '')
+		.toLowerCase()
+		.normalize('NFKD')
+		.replace(/[^a-z0-9]+/g, '');
+}
+
 function renewlyBackupRows(data, options) {
 	const methodNames = new Map(
 		(Array.isArray(data.paymentMethods) ? data.paymentMethods : []).map((method) => [
@@ -68,7 +78,9 @@ function renewlyBackupRows(data, options) {
 					? 'transfer'
 					: 'expense';
 			const methodText = methodNames.get(String(transaction.paymentMethodId ?? '')) || '';
-			const paymentMethodId = matchMethod(methodText, options.methods) ?? options.defaultMethodId ?? null;
+			const matchedMethodId = matchMethod(methodText, options.methods);
+			const missingMethod = missingMethodLabel(methodText, matchedMethodId);
+			const paymentMethodId = matchedMethodId ?? (methodText ? null : options.defaultMethodId ?? null);
 			const targetText = methodNames.get(String(transaction.toPaymentMethodId ?? '')) || '';
 			const transferMethodId =
 				type === 'transfer' ? matchMethod(targetText, options.methods) ?? null : null;
@@ -89,7 +101,8 @@ function renewlyBackupRows(data, options) {
 				paymentMethodId,
 				transferMethodId,
 				direction: type === 'transfer' ? 'out' : null,
-				methodLabel: options.methods.find((method) => method.id === paymentMethodId)?.label || '',
+				methodLabel: options.methods.find((method) => method.id === paymentMethodId)?.label || missingMethod || '',
+				missingMethod,
 				source: 'Renewly JSON import',
 			};
 		})
@@ -283,6 +296,11 @@ export async function parseImportFile(file, options = {}) {
 			(row) => row.type === 'transfer' && row.transferMethodId === null
 		).length,
 	};
+	const missingMethods = [...new Set(
+		rows
+			.filter((row) => !row.duplicate && row.missingMethod)
+			.map((row) => row.missingMethod)
+	)].map((label) => ({ label, kind: inferPaymentKind(label) }));
 	return {
 		fileName: name,
 		format: formatLabel(extension),
@@ -290,11 +308,55 @@ export async function parseImportFile(file, options = {}) {
 		stats,
 		warnings: warningsFor(stats, warnings),
 		analysis: analyze(rows),
+		missingMethods,
 	};
 }
 
 export async function importRows(db, rows, options = {}) {
-	const { defaultMethodId = null, existing = [] } = options;
+	const {
+		defaultMethodId = null,
+		existing = [],
+		createMissingMethods = false,
+		today = new Date().toISOString().slice(0, 10),
+	} = options;
+	const existingMethods = await store.listPaymentMethods(db);
+	const methodMap = new Map(
+		existingMethods.map((method) => [methodKey(method.label), method.id])
+	);
+	const missing = new Map();
+	for (const row of rows || []) {
+		if (row.duplicate || !row.missingMethod) continue;
+		const key = methodKey(row.missingMethod);
+		if (methodMap.has(key)) continue;
+		const current = missing.get(key);
+		if (!current || (row.date && row.date < current.earliest)) {
+			missing.set(key, { label: row.missingMethod, earliest: row.date || current?.earliest || today });
+		}
+	}
+	const createdMethods = [];
+	if (createMissingMethods) {
+		for (const [key, entry] of missing) {
+			const kind = inferPaymentKind(entry.label);
+			try {
+				const method = await store.savePaymentMethod(db, {
+					label: entry.label,
+					kind,
+					instrument: instrumentFor(kind),
+					openingBalanceCents: 0,
+					openingDate: entry.earliest || today,
+					notes: 'Created from an imported statement. Set the starting balance if the statement did not start at zero.',
+				});
+				methodMap.set(key, method.id);
+				createdMethods.push({ id: method.id, label: method.label, kind });
+			} catch {
+				// A concurrent or duplicate record can still be matched by label.
+				const match = (await store.listPaymentMethods(db)).find(
+					(method) => methodKey(method.label) === key
+				);
+				if (match) methodMap.set(key, match.id);
+			}
+		}
+	}
 	const keys = new Set(
 		(existing || [])
 			.filter((row) => row && ['expense', 'income', 'transfer'].includes(row.type))
@@ -318,7 +380,11 @@ export async function importRows(db, rows, options = {}) {
 			skipped += 1;
 			continue;
 		}
-		const statementMethodId = row.paymentMethodId ?? defaultMethodId ?? null;
+		let statementMethodId = row.paymentMethodId ?? null;
+		if (statementMethodId === null && row.missingMethod) {
+			statementMethodId = methodMap.get(methodKey(row.missingMethod)) ?? null;
+		}
+		if (statementMethodId === null) statementMethodId = defaultMethodId ?? null;
 		let paymentMethodId = statementMethodId;
 		let toPaymentMethodId = null;
 		let key = duplicateKey(row, statementMethodId);
@@ -373,6 +439,7 @@ export async function importRows(db, rows, options = {}) {
 		skipped,
 		failed,
 		needsAccount,
+		createdMethods,
 	};
 }
 

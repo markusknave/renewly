@@ -35,7 +35,7 @@ function methodFields(method) {
 	const rate = Number.isInteger(method.interestRateBps) ? (method.interestRateBps / 100).toFixed(2) : '';
 	return `<div class="grid-3">
 		<label>Type<select name="kind" data-method-kind>${options(
-			['card', 'ewallet', 'bank', 'cash', 'other'],
+			['card', 'ewallet', 'bank', 'credit', 'cash', 'other'],
 			kind,
 			PAYMENT_KIND_LABELS
 		)}</select></label>
@@ -50,7 +50,7 @@ function methodFields(method) {
 		)}" placeholder="1234" /></label>
 	</div>
 	<div class="grid-3">
-		<label>Network<select name="network">${networkOptions(method.network || '')}</select></label>
+		<label data-network-field${kind === 'card' ? '' : ' hidden'}>Network<select name="network">${networkOptions(method.network || '')}</select></label>
 		<label>Starting balance (PHP)<input type="text" name="openingBalance" inputmode="decimal" value="${esc(
 			opening
 		)}" placeholder="0.00" /></label>
@@ -110,7 +110,7 @@ export function cardsView({ methods = [], snapshots = [], today }) {
 		</div>
 	</div>
 	<section class="panel">
-		<div class="panel-head"><h2>Add a card or wallet</h2></div>
+		<div class="panel-head"><h2>Add a card, wallet, or credit line</h2></div>
 		<form class="stack compact" data-form="method">
 			${methodFields({ kind: 'card', label: '', openingDate: today || '' })}
 			<div class="form-actions"><button class="btn btn-primary" type="submit">Add payment method</button></div>
@@ -120,7 +120,7 @@ export function cardsView({ methods = [], snapshots = [], today }) {
 		<div class="panel-head"><h2>Your money</h2><span class="muted small">${methods.length} saved</span></div>
 		${
 			rows ||
-			`<div class="empty"><h3>No payment methods yet</h3><p class="muted">Add a bank, card, or e-wallet, set its current balance, and optionally its annual interest rate.</p></div>`
+			`<div class="empty"><h3>No payment methods yet</h3><p class="muted">Add a bank, card, e-wallet, or credit line, set its current balance, and optionally its annual interest rate.</p></div>`
 		}
 	</section>
 	<section class="panel panel-muted">

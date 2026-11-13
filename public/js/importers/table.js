@@ -251,6 +251,19 @@ export function matchMethod(value, methods = []) {
 	return null;
 }
 
+const GENERIC_METHOD_TEXT = /^(cash|card|credit|debit|account|wallet|bank|other|no method|none|n\/a|-)$/i;
+
+// The account column can name a bank or wallet that is not saved yet. Keep a
+// clean label so the import can offer to create it instead of silently using
+// the default account.
+export function missingMethodLabel(value, matchedId = null) {
+	if (matchedId !== null && matchedId !== undefined) return null;
+	const text = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+	if (!text || GENERIC_METHOD_TEXT.test(text)) return null;
+	if (!/[a-z]/i.test(text)) return null;
+	return text;
+}
+
 // Finds the other account named in a transfer description. It ignores generic
 // words such as "bank" or "debit" so "BPI Debit" is not matched by every bank
 // row, and it can skip the statement's own account.
@@ -448,11 +461,13 @@ export function rowsToTransactions(rows, options = {}) {
 			: type === 'transfer'
 				? 'other'
 				: mapCategory(categoryText) || detectCategory(`${description} ${notes}`) || 'other';
-		const methodText = cell(row, mapping.method);
-		const paymentMethodId = matchMethod(methodText, methods) ?? defaultMethodId ?? null;
+		const methodText = String(cell(row, mapping.method) ?? '').trim();
+		const matchedMethodId = matchMethod(methodText, methods);
+		const missingMethod = missingMethodLabel(methodText, matchedMethodId);
+		const paymentMethodId = matchedMethodId ?? (methodText ? null : defaultMethodId ?? null);
 		const transferMethodId = type === 'transfer'
 			? matchTransferMethod(
-					`${description} ${notes} ${String(methodText ?? '')}`,
+					`${description} ${notes} ${methodText}`,
 					methods,
 					paymentMethodId
 				)
@@ -468,7 +483,11 @@ export function rowsToTransactions(rows, options = {}) {
 			paymentMethodId,
 			transferMethodId,
 			direction: type === 'transfer' ? direction : null,
-			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
+			methodLabel:
+				methods.find((method) => method.id === paymentMethodId)?.label ||
+				missingMethod ||
+				(methodText ? '' : methods.find((method) => method.id === defaultMethodId)?.label || ''),
+			missingMethod,
 			source: sourceLabel,
 		};
 		if (type === 'income') {

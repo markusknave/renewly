@@ -166,7 +166,7 @@ export function homeView({
 				? `<div class="card-carousel">${cards}</div>`
 				: emptyState(
 						'No payment methods yet',
-						'Add a bank, card, or e-wallet with its current balance to see it here.',
+						'Add a bank, card, e-wallet, or credit line with its current balance to see it here.',
 						'<p><a class="btn btn-primary" href="#/cards">Add a payment method</a></p>'
 					)
 		}

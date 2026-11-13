@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renewly-shell-v10';
+const CACHE_NAME = 'renewly-shell-v11';
 const APP_ASSETS = [
 	'./',
 	'./index.html',
@@ -37,6 +37,7 @@ const APP_ASSETS = [
 	'./js/lib/timezones.js',
 	'./js/lib/categories.js',
 	'./js/lib/cardThemes.js',
+	'./js/lib/combobox.js',
 	'./vendor/tesseract/tesseract.min.js',
 	'./vendor/tesseract/worker.min.js',
 	'./vendor/tesseract/tesseract-core-lstm.wasm.js',

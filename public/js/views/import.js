@@ -3,6 +3,7 @@
 
 import { formatDateHuman, formatMoney } from '../lib/dates.js';
 import { categoryLabel } from '../lib/categories.js';
+import { PAYMENT_KIND_LABELS } from '../store.js';
 import { IMPORT_ACCEPT } from '../import.js';
 import { breadcrumb, esc, icon } from './shared.js';
 
@@ -17,7 +18,7 @@ function statusPill(row) {
 function transferOptions(row, methods) {
 	return `<select class="import-transfer-select" data-import-transfer data-index="${
 		row.index
-	}" aria-label="Other transfer account">
+	}" data-searchable data-combo-placeholder="Search accounts…" aria-label="Other transfer account">
 		<option value="">Other account…</option>
 		${methods
 			.filter((method) => String(method.id) !== String(row.paymentMethodId ?? ''))
@@ -95,6 +96,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 	).length;
 	const duplicateCount = rows.filter((row) => row.duplicate).length;
 	const stats = preview?.stats || null;
+	const missingMethods = preview?.missingMethods || [];
 
 	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Import transactions' }])}
 	<div class="page-head">
@@ -142,9 +144,26 @@ export function importView({ methods = [], preview = null, busy = false, default
 						: ''
 				}
 				<form class="stack" data-form="import-expenses">
+					${
+						missingMethods.length
+							? `<label class="check-row">
+								<input type="checkbox" name="createMissingMethods" value="1" checked />
+								<span>Create ${missingMethods.length} missing account${
+									missingMethods.length === 1 ? '' : 's'
+								}: ${missingMethods
+									.map(
+										(method) =>
+											`<strong>${esc(method.label)}</strong> <span class="muted small">${esc(
+												PAYMENT_KIND_LABELS[method.kind] || method.kind
+											)}</span>`
+									)
+									.join(', ')}</span>
+							</label>`
+							: ''
+					}
 					<div class="grid-2">
 						<label>Payment method for rows without one
-							<select name="defaultMethodId">
+							<select name="defaultMethodId" data-searchable data-combo-placeholder="Search accounts…">
 								<option value="">No method</option>
 								${methods
 									.map(
@@ -161,7 +180,7 @@ export function importView({ methods = [], preview = null, busy = false, default
 							<button class="btn" type="button" data-action="clear-import">Clear</button>
 						</div>
 					</div>
-					<p class="hint">The analyst matched categories from the description and notes. Use the Type column to correct a row before importing; transfers need the other account selected in the Account column. You can also edit any imported transaction afterward.</p>
+					<p class="hint">The analyst matched categories from the description and notes. Use the Type column to correct a row before importing; transfers need the other account selected in the Account column. Unmatched account names can be created with the checkbox above. You can also edit any imported transaction afterward.</p>
 					${previewRows(rows, methods)}
 					${
 						rows.length > 100

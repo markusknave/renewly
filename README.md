@@ -108,9 +108,14 @@ renewly-beta-1.4.apk
 
 - Add an expense or income entry with date, description, amount, category,
   notes, and payment method.
-- Move money between two saved accounts with a transfer. The source is debited,
-  the destination is credited, and the transfer is excluded from expense and
-  income totals. The source must have enough balance on the entry date.
+- Move money between any two saved accounts with a transfer, including bank to
+  e-wallet and e-wallet to bank. The source is debited, the destination is
+  credited, and the transfer is excluded from expense and income totals. The
+  source must have enough balance on the entry date.
+- Account, provider, platform, plan, and time-zone pickers are searchable: open
+  the dropdown, type part of the bank, wallet, or credit provider name, and pick
+  the match. Native form values are preserved, so imports and exports are
+  unchanged.
 - Scan a receipt, payslip, or bank transfer confirmation to prefill the dialog.
   The parser prefers a printed grand total, amount due, net pay, or net income
   and stays editable before saving.
@@ -132,8 +137,11 @@ renewly-beta-1.4.apk
 - Open **Expenses → Import** or **More → Import transactions**. Choose or drop a
   file, review the parsed rows, then import.
 - The local analyst infers categories from the description and notes, and
-  matches account/card names to your saved payment methods. Rows without a
-  match use the default method you choose.
+  matches account/card names to your saved payment methods. When the statement
+  names a card or wallet you have not saved, the preview lists it under
+  **Create missing accounts** (checked by default) and creates it with the
+  inferred type: bank account, e-wallet, card, or Credit / BNPL. Clear the
+  checkbox to send those rows to the default account instead.
 - Debit, withdrawal, and expense rows become expenses. Credit, deposit, salary,
   refund, and income rows become income. Transfer, InstaPay, PESONet, and
   "sent to"/"received from" rows become transfers; the preview matches the
@@ -164,13 +172,23 @@ renewly-beta-1.4.apk
 
 ### Cards and interest
 
-- Cards, e-wallets, bank accounts, cash, and other accounts.
+- Cards, e-wallets, bank accounts, credit / BNPL accounts, cash, and other
+  accounts.
+- The payment-method type is **Bank account** (not "bank transfer"); transfers
+  are separate ledger entries and can connect any two account types.
+- Credit / BNPL providers include Atome, BillEase, Home Credit, Salmon, Tala,
+  Cashalo, Akulaku, JuanHand, UnaCash, Maya Credit, GLoan, SPayLater, and
+  LazPayLater.
+- Additional Philippine banks include PBCom, Philtrust, CTBC, Bank of China
+  (Manila), MUFG Manila, Philippine Veterans Bank, Producers Bank, First
+  Consolidated Bank, and Al-Amanah.
 - Stylised card art for BPI, BDO, Metrobank, UnionBank, RCBC, Security Bank,
   Chinabank, LANDBANK, PNB, CIMB, Maya, GCash, GoTyme, Tonik, MariBank,
   Netbank, UNO, UnionDigital, Komo, DiskarTech, GrabPay, ShopeePay, PayPal, Wise,
-  American Express, Citi, HSBC, Standard Chartered, and Maybank. Other providers
-  use a clean fallback based on account type. SeaBank Philippines was renamed
-  MariBank in 2025, so the app uses the current name.
+  American Express, Citi, HSBC, Standard Chartered, Maybank, Atome, BillEase,
+  Home Credit, Salmon, Tala, Cashalo, Akulaku, Maya Credit, and GLoan. Other
+  providers use a clean fallback based on account type. SeaBank Philippines was
+  renamed MariBank in 2025, so the app uses the current name.
 - Set the instrument (debit, credit, prepaid, account, wallet, or cash), the
   network, the annual rate in percent (for example `3.25`), and daily or monthly
   compounding.
@@ -480,7 +498,8 @@ public/
   js/views/              dashboard, expenses, goals, insights, import, cards,
                          more, subscriptions, shared helpers
   js/lib/dates.js        date, money, and cadence helpers
-  js/lib/providers.js    Philippine banks and e-wallets per payment type
+  js/lib/providers.js    Philippine banks, wallets, and credit providers
+  js/lib/combobox.js     searchable select enhancement for long pickers
   js/lib/categories.js   expense categories, colors, icons, keywords
   js/lib/cardThemes.js   stylised Philippine card themes
   js/lib/timezones.js    IANA zone list with current UTC offsets

@@ -110,8 +110,8 @@ export function providerOptions(kind, selected) {
 
 export function methodProviderField(kind, label) {
 	const custom = Boolean(label) && !providersFor(kind).includes(label);
-	return `<label>Bank / E-wallet
-		<select name="provider" data-method-provider>${providerOptions(kind, label)}</select>
+	return `<label>Provider
+		<select name="provider" data-method-provider data-searchable data-combo-placeholder="Search banks, wallets, or credit providers…">${providerOptions(kind, label)}</select>
 	</label>
 	<label data-custom-method-label${custom ? '' : ' hidden'}>Custom label
 		<input type="text" name="customLabel" maxlength="60" value="${
@@ -310,3 +310,5 @@ export function progressBar(percent, color = 'var(--brand)') {
 export function emptyState(title, body, action = '') {
 	return `<div class="empty"><h3>${esc(title)}</h3><p class="muted">${esc(body)}</p>${action}</div>`;
 }
+
+export { enhanceSelects, refreshSelect, refreshSelects } from '../lib/combobox.js';

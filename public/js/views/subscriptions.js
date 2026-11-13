@@ -236,7 +236,7 @@ export function formView({ sub, methods, groups = [], catalog, today, duplicate 
 		<form class="stack" data-form="subscription"${editing ? ` data-id="${s.id}"` : ''}>
 			<div class="grid-2">
 				<label>Platform
-					<select name="platformKey" data-platform>${platformOptions(catalog, platform ? platform.key : '')}</select>
+					<select name="platformKey" data-platform data-searchable data-combo-placeholder="Search platforms…">${platformOptions(catalog, platform ? platform.key : '')}</select>
 				</label>
 				<label>Service name
 					<input type="text" name="merchantName" maxlength="${MAX_DISPLAY_NAME}" required value="${esc(
@@ -247,7 +247,7 @@ export function formView({ sub, methods, groups = [], catalog, today, duplicate 
 			</div>
 			<div class="grid-2">
 				<label>Plan
-					<select name="planId" data-plan${platform ? '' : ' disabled'}>${planOptions(platform, s.planId)}</select>
+					<select name="planId" data-plan data-searchable data-combo-placeholder="Search plans…"${platform ? '' : ' disabled'}>${planOptions(platform, s.planId)}</select>
 					<span class="hint">${platform ? 'Pick a plan to prefill the price and billing cycle.' : 'Choose a platform to use catalog plans.'}</span>
 				</label>
 				<label>Plan name
@@ -265,7 +265,7 @@ export function formView({ sub, methods, groups = [], catalog, today, duplicate 
 					<input type="text" name="amount" inputmode="decimal" value="${esc(amountValue)}" placeholder="149.00" />
 				</label>
 				<label>Payment method
-					<select name="paymentMethodId">
+					<select name="paymentMethodId" data-searchable data-combo-placeholder="Search accounts…">
 						<option value="">Not set</option>
 						${methods
 							.map(
@@ -518,7 +518,7 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 		<form class="stack" data-form="settings">
 			<div class="grid-2">
 				<label>Time zone
-					<select name="timezone">${zones}</select>
+					<select name="timezone" data-searchable data-combo-placeholder="Search time zones…">${zones}</select>
 					<span class="hint">All time zones are listed with their current UTC offset, including daylight-saving shifts. Used to decide what "today" means.</span>
 				</label>
 				<label>Reminder days

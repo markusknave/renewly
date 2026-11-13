@@ -46,11 +46,12 @@ function subscriptionInput(overrides = {}) {
 test('exports the contract constants', () => {
   assert.deepEqual(CADENCES, ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom']);
   assert.deepEqual(STATUSES, ['active', 'trial', 'paused', 'canceled']);
-  assert.deepEqual(PAYMENT_KINDS, ['card', 'ewallet', 'bank', 'cash', 'other']);
+  assert.deepEqual(PAYMENT_KINDS, ['card', 'ewallet', 'bank', 'credit', 'cash', 'other']);
   assert.deepEqual(PAYMENT_KIND_LABELS, {
     card: 'Card',
     ewallet: 'E-wallet',
-    bank: 'Bank transfer',
+    bank: 'Bank account',
+    credit: 'Credit / BNPL',
     cash: 'Cash',
     other: 'Other',
   });

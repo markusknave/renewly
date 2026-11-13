@@ -11,11 +11,12 @@ import {
 
 export const CADENCES = ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom'];
 export const STATUSES = ['active', 'trial', 'paused', 'canceled'];
-export const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'cash', 'other'];
+export const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'credit', 'cash', 'other'];
 export const PAYMENT_KIND_LABELS = {
   card: 'Card',
   ewallet: 'E-wallet',
-  bank: 'Bank transfer',
+  bank: 'Bank account',
+  credit: 'Credit / BNPL',
   cash: 'Cash',
   other: 'Other',
 };

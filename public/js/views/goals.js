@@ -133,7 +133,7 @@ export function transferDialog({ today, methods = [], goals = [] }) {
 				<option value="from_goal">Back to a payment method</option>
 			</select></label>
 			<div class="grid-2">
-				<label>Payment method<select name="paymentMethodId">${methods
+				<label>Payment method<select name="paymentMethodId" data-searchable data-combo-placeholder="Search accounts…">${methods
 					.map((method) => `<option value="${method.id}">${esc(method.label)}</option>`)
 					.join('')}</select></label>
 				<label>Amount (PHP)<input type="text" name="amount" inputmode="decimal" required placeholder="0.00" /></label>
