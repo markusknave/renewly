@@ -88,6 +88,68 @@ test('incoming transfers increase the interest base of the receiving account', a
 	assert.ok(withTransfer > without);
 });
 
+test('a transfer row can use the default source account on commit', async () => {
+	const { db, bpi, maya } = await accounts();
+	await saveExpense(db, {
+		type: 'expense',
+		date: '2026-11-01',
+		merchant: 'Opening spend',
+		amountCents: 100_000,
+		paymentMethodId: bpi.id,
+	});
+	const result = await importRows(
+		db,
+		[
+			{
+				type: 'transfer',
+				date: '2026-11-02',
+				merchant: 'Transfer to Maya',
+				amountCents: 100_000,
+				category: 'other',
+				notes: '',
+				paymentMethodId: null,
+				transferMethodId: maya.id,
+				direction: 'out',
+				duplicate: false,
+			},
+		],
+		{ defaultMethodId: bpi.id, existing: [] }
+	);
+	assert.equal(result.importedTransfer, 1);
+	assert.equal(result.needsAccount, 0);
+	const rows = await listTransactions(db);
+	assert.equal(methodBalance(bpi, rows, '2026-11-02'), 800_000);
+	assert.equal(methodBalance(maya, rows, '2026-11-02'), 100_000);
+});
+
+test('a debit card can fund an e-wallet transfer', async () => {
+	const db = createMemoryBackend();
+	const debit = await savePaymentMethod(db, {
+		label: 'BPI Debit',
+		kind: 'card',
+		instrument: 'debit',
+		openingBalanceCents: 500_000,
+		openingDate: '2026-11-01',
+	});
+	const wallet = await savePaymentMethod(db, {
+		label: 'GCash',
+		kind: 'ewallet',
+		instrument: 'wallet',
+		openingBalanceCents: 10_000,
+		openingDate: '2026-11-01',
+	});
+	await saveExpense(db, {
+		type: 'transfer',
+		date: '2026-11-02',
+		amountCents: 150_000,
+		paymentMethodId: debit.id,
+		toPaymentMethodId: wallet.id,
+	});
+	const rows = await listTransactions(db);
+	assert.equal(methodBalance(debit, rows, '2026-11-02'), 350_000);
+	assert.equal(methodBalance(wallet, rows, '2026-11-02'), 160_000);
+});
+
 test('transfers validate both accounts and the available source balance', async () => {
 	const { db, bpi, maya } = await accounts();
 	const missing = validateExpenseInput({

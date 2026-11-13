@@ -9,9 +9,11 @@ import * as report from './export.js';
 import * as notifications from './notifications.js';
 import * as backup from './backup.js';
 import { CUSTOM_PROVIDER } from './lib/providers.js';
+import { instrumentFor } from './lib/cardThemes.js';
 import { findPlan, findPlatform, loadCatalog } from './catalog.js';
 import { formatMoney, parseNumericAmount, todayInTz } from './lib/dates.js';
 import { EXPENSE_CATEGORIES } from './lib/categories.js';
+import { applyAppearance, DEFAULT_APPEARANCE } from './lib/themes.js';
 import * as views from './views.js';
 
 const app = document.getElementById('app');
@@ -24,7 +26,12 @@ const state = {
 	transactions: [],
 	goals: [],
 	groupFilter: '',
-	settings: { currency: 'PHP', timezone: 'Asia/Manila', reminderDays: [7, 3, 1] },
+	settings: {
+		currency: 'PHP',
+		timezone: 'Asia/Manila',
+		reminderDays: [7, 3, 1],
+		...DEFAULT_APPEARANCE,
+	},
 	catalog: null,
 	flash: null,
 	formDraft: null,
@@ -55,7 +62,7 @@ function parseRoute() {
 	if (!parts.length) return { name: 'home' };
 	if (parts[0] === 'add') return { name: 'add', platformKey: parts[1] || '', planId: parts[2] || '' };
 	if (parts[0] === 'edit') return { name: 'edit', id: Number(parts[1]) };
-	const known = ['expenses', 'goals', 'insights', 'more', 'subscriptions', 'catalog', 'cards', 'groups', 'settings', 'import'];
+	const known = ['expenses', 'goals', 'insights', 'more', 'subscriptions', 'catalog', 'cards', 'groups', 'settings', 'appearance', 'import'];
 	if (known.includes(parts[0])) {
 		const newParam = query.get('new');
 		const newExpenseType =
@@ -78,11 +85,12 @@ function setNav(routeName) {
 		goals: 'goals',
 		insights: 'insights',
 		more: 'more',
-		subscriptions: 'more',
-		cards: 'more',
+		subscriptions: 'subscriptions',
+		cards: 'cards',
 		catalog: 'more',
 		groups: 'more',
 		settings: 'more',
+		appearance: 'more',
 		import: 'more',
 		add: 'more',
 		edit: 'more',
@@ -116,6 +124,7 @@ async function reload() {
 	state.goals = await store.listGoals(state.db);
 	state.transactions = await store.listTransactions(state.db);
 	state.settings = await store.getSettings(state.db);
+	applyAppearance(state.settings);
 	if (
 		state.groupFilter
 		&& state.groupFilter !== 'none'
@@ -193,6 +202,7 @@ function greeting() {
 async function render() {
 	const token = ++renderToken;
 	const route = parseRoute();
+	document.body.dataset.route = route.name;
 	const flash = state.flash;
 	state.flash = null;
 	setNav(route.name);
@@ -366,6 +376,8 @@ async function render() {
 			methods: state.methods,
 			today: iso,
 		});
+	} else if (route.name === 'appearance') {
+		body = views.appearanceView({ settings: state.settings });
 	} else if (route.name === 'settings') {
 		body = views.settingsView({
 			settings: state.settings,
@@ -1266,6 +1278,19 @@ async function onSubmit(event) {
 			await render();
 			return;
 		}
+		if (type === 'appearance') {
+			const fd = new FormData(form);
+			await store.saveSettings(state.db, {
+				theme: String(fd.get('theme') || DEFAULT_APPEARANCE.theme),
+				font: String(fd.get('font') || DEFAULT_APPEARANCE.font),
+				customAccent: String(fd.get('customAccent') || DEFAULT_APPEARANCE.customAccent),
+				customBackground: String(fd.get('customBackground') || DEFAULT_APPEARANCE.customBackground),
+			});
+			state.flash = { type: 'ok', message: 'Appearance updated' };
+			await reload();
+			await render();
+			return;
+		}
 		if (type === 'chat') {
 			const fd = new FormData(form);
 			const question = String(fd.get('message') || '').trim();
@@ -1442,6 +1467,36 @@ function filterExpenseDom() {
 
 async function onChange(event) {
 	const target = event.target;
+	if (target.matches('[data-theme-choice]')) {
+		state.settings.theme = target.value;
+		applyAppearance(state.settings);
+		for (const card of document.querySelectorAll('[data-theme-card]')) {
+			card.classList.toggle('is-active', card.dataset.themeCard === target.value);
+		}
+		return;
+	}
+	if (target.matches('[data-font-choice]')) {
+		state.settings.font = target.value;
+		applyAppearance(state.settings);
+		for (const card of document.querySelectorAll('[data-font-card]')) {
+			card.classList.toggle('is-active', card.dataset.fontCard === target.value);
+		}
+		return;
+	}
+	if (target.matches('[data-custom-accent]')) {
+		state.settings.customAccent = target.value;
+		const code = target.closest('.color-field')?.querySelector('code');
+		if (code) code.textContent = target.value;
+		applyAppearance(state.settings);
+		return;
+	}
+	if (target.matches('[data-custom-background]')) {
+		state.settings.customBackground = target.value;
+		const code = target.closest('.color-field')?.querySelector('code');
+		if (code) code.textContent = target.value;
+		applyAppearance(state.settings);
+		return;
+	}
 	if (target.id === 'import-file' && target.files?.[0]) {
 		const file = target.files[0];
 		try {
@@ -1515,6 +1570,26 @@ async function onChange(event) {
 		}
 		return;
 	}
+	if (target.matches('[data-import-transfer-source]')) {
+		const preview = state.importPreview;
+		const index = Number(target.dataset.index);
+		if (preview?.rows?.[index]) {
+			const row = preview.rows[index];
+			const sourceId = target.value ? Number(target.value) : null;
+			preview.rows[index] = {
+				...row,
+				paymentMethodId: sourceId,
+				transferMethodId:
+					sourceId !== null && String(row.transferMethodId) === String(sourceId)
+						? null
+						: row.transferMethodId,
+				duplicate: false,
+			};
+			refreshImportPreview(preview);
+			await render();
+		}
+		return;
+	}
 	if (target.matches('[data-import-transfer]')) {
 		const preview = state.importPreview;
 		const index = Number(target.dataset.index);
@@ -1564,6 +1639,11 @@ async function onChange(event) {
 		}
 		const networkField = form.querySelector('[data-network-field]');
 		if (networkField) networkField.hidden = target.value !== 'card';
+		const instrumentSelect = form.querySelector('[name="instrument"]');
+		if (instrumentSelect) {
+			instrumentSelect.value = instrumentFor(target.value);
+			views.refreshSelect(instrumentSelect);
+		}
 		const customWrap = form.querySelector('[data-custom-method-label]');
 		if (customWrap) {
 			customWrap.hidden = true;
@@ -1639,6 +1719,20 @@ async function onChange(event) {
 }
 
 function onInput(event) {
+	if (event.target.matches('[data-custom-accent]')) {
+		state.settings.customAccent = event.target.value;
+		const code = event.target.closest('.color-field')?.querySelector('code');
+		if (code) code.textContent = event.target.value;
+		applyAppearance(state.settings);
+		return;
+	}
+	if (event.target.matches('[data-custom-background]')) {
+		state.settings.customBackground = event.target.value;
+		const code = event.target.closest('.color-field')?.querySelector('code');
+		if (code) code.textContent = event.target.value;
+		applyAppearance(state.settings);
+		return;
+	}
 	if (event.target.matches('[data-catalog-search]')) {
 		filterCatalog();
 		return;

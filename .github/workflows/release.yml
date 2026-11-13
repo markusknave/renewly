@@ -66,6 +66,9 @@ jobs:
           printf '%s' "$RENEWLY_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/renewly-beta.p12"
           echo "RENEWLY_KEYSTORE_FILE=$RUNNER_TEMP/renewly-beta.p12" >> "$GITHUB_ENV"
       - run: npx cap sync android
+      - name: Run Robolectric shell tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --no-daemon
       - name: Build signed release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon

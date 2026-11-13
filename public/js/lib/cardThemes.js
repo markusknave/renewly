@@ -519,11 +519,69 @@ const FALLBACKS = {
 	},
 };
 
-export function cardThemeFor(label, kind = 'other', network = '') {
+// Credit cards from the same issuer often use a darker premium finish than
+// the everyday debit card, while e-wallets stay bright. These overrides keep
+// the existing layouts but track the colours people actually see in PH wallets.
+const CREDIT_PALETTES = {
+	bpi: { c1: '#071f4a', c2: '#123a86' },
+	bdo: { c1: '#06152e', c2: '#0a3f7d' },
+	metrobank: { c1: '#0a1c45', c2: '#214899' },
+	unionbank: { c1: '#111114', c2: '#2c2c32', accent: '#f58220' },
+	rcbc: { c1: '#171519', c2: '#3c2b2b', accent: '#d4af37' },
+	securitybank: { c1: '#06182c', c2: '#0b4659' },
+	chinabank: { c1: '#5c1010', c2: '#991b1b' },
+	landbank: { c1: '#043a2c', c2: '#066b52' },
+	pnb: { c1: '#091d47', c2: '#173d8f' },
+	cimb: { c1: '#4c1010', c2: '#b91c1c' },
+	maya: { c1: '#050607', c2: '#1f2937' },
+	'shopeepay': { c1: '#8a2d0e', c2: '#e2481a' },
+	hsbc: { c1: '#2b0707', c2: '#991b1b' },
+	atome: { c1: '#141018', c2: '#3b2455', accent: '#f5c542' },
+	billease: { c1: '#12351f', c2: '#2f7d46', accent: '#f4d35e' },
+	homecredit: { c1: '#54100f', c2: '#b91c1c' },
+	'mayacredit': { c1: '#050607', c2: '#134e4a', accent: '#00e08a' },
+};
+
+function darkenHex(hex, amount) {
+	const value = String(hex || '').replace('#', '');
+	if (!/^[0-9a-f]{6}$/i.test(value)) return hex;
+	const parts = [0, 2, 4].map((index) => {
+		const channel = parseInt(value.slice(index, index + 2), 16);
+		return Math.max(0, Math.round(channel * (1 - amount))).toString(16).padStart(2, '0');
+	});
+	return `#${parts.join('')}`;
+}
+
+function lightenHex(hex, amount) {
+	const value = String(hex || '').replace('#', '');
+	if (!/^[0-9a-f]{6}$/i.test(value)) return hex;
+	const parts = [0, 2, 4].map((index) => {
+		const channel = parseInt(value.slice(index, index + 2), 16);
+		return Math.min(255, Math.round(channel + (255 - channel) * amount)).toString(16).padStart(2, '0');
+	});
+	return `#${parts.join('')}`;
+}
+
+export function cardThemeFor(label, kind = 'other', network = '', instrument = '') {
 	const text = String(label || '').toLowerCase();
 	const theme = THEMES.find((candidate) => candidate.match.some((needle) => text.includes(needle)));
 	const base = theme || FALLBACKS[kind] || FALLBACKS.other;
 	const chosen = CARD_NETWORKS.includes(network) ? network : base.network;
+	const resolvedInstrument = INSTRUMENTS.includes(instrument) ? instrument : '';
+	const credit = CREDIT_PALETTES[base.key];
+	if (resolvedInstrument === 'credit') {
+		return {
+			...base,
+			...(credit || { c1: darkenHex(base.c1, 0.24), c2: darkenHex(base.c2, 0.12) }),
+			network: chosen,
+		};
+	}
+	if (resolvedInstrument === 'prepaid') {
+		return { ...base, c1: lightenHex(base.c1, 0.08), c2: lightenHex(base.c2, 0.08), network: chosen };
+	}
+	if (resolvedInstrument === 'wallet') {
+		return { ...base, c2: lightenHex(base.c2, 0.05), network: chosen };
+	}
 	return { ...base, network: chosen };
 }
 

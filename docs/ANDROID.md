@@ -118,7 +118,7 @@ The widget has no background service and stores no data.
   `transactions` and `goals` stores and leaves existing subscriptions, payment
   methods, groups, and settings alone.
 - Android updates an app in place when the package name, version code, and
-  signing key match. Version code 7 and the rotated beta key guarantee that for
+  signing key match. Version code 10 and the rotated beta key guarantee that for
   beta-1.2-hotfix and newer builds.
 - Sideloading a package signed by a different key fails with
   `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the only workaround is a one-time
@@ -155,9 +155,24 @@ notification while it is open.
 
 `.github/workflows/ci.yml` runs on every pull request and on `main`. It runs
 Vitest with coverage, npm audit, gitleaks, actionlint, Trivy, and CodeQL. The
-Android job installs Node, Java, and the Android SDK, syncs Capacitor, and
-builds an unsigned debug APK. It does not receive release signing secrets and
-uploads no APK.
+Android job installs Node, Java, and the Android SDK, syncs Capacitor, runs the
+Robolectric unit tests (`./gradlew testDebugUnitTest`), and builds an unsigned
+debug APK. It does not receive release signing secrets and uploads no APK.
+
+Run the Robolectric shell tests locally with:
+
+```bash
+npx cap sync android
+cd android && ./gradlew testDebugUnitTest
+```
+
+`AndroidShellTest` launches `MainActivity`, asserts the Capacitor WebView is
+present, reads the packaged `public/index.html`, `styles.css`, and
+`fonts/fonts.css` assets to confirm the current build was synced, verifies the
+quick-add widget, and checks the launcher and widget receivers. `Capacitor`
+service-worker interception is disabled in `capacitor.config.json` because the
+Android shell serves local assets directly and the setting lets Robolectric
+instantiate the WebView without a real Chromium provider.
 
 `.github/workflows/release.yml` runs only when a `beta-*` tag is pushed. It
 repeats the tests and security gates, decodes `RENEWLY_KEYSTORE_BASE64` into
@@ -205,7 +220,7 @@ npm run icons
 | Old UI after an update | Fully close the app; bump `CACHE_NAME` in `public/sw.js`; rebuild the APK. |
 | Catalog is empty | Confirm `public/data/plans.json` exists and was copied by `android:sync`. |
 | Data disappeared | App storage was cleared or the APK was uninstalled. Restore from an exported JSON file. |
-| Install says signature mismatch | The old APK used the retired key. Export data, uninstall once, install beta-1.4, then import the JSON file. |
+| Install says signature mismatch | The old APK used the retired key. Export data, uninstall once, install beta-2.1, then import the JSON file. |
 | No notification when closed | Grant notification/alarm permission in Android settings and allow Renewly to run without battery restrictions. |
 | Build fails with missing SDK | Install Android SDK Platform 36 and Build-Tools in Android Studio. |
 | PWA install option missing | The page is not HTTPS or `localhost`. Use the APK or an HTTPS host. |

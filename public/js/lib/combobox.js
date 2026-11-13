@@ -104,7 +104,14 @@ function open(state) {
 	positionPanel(state);
 	state.search.value = '';
 	state.filterList();
-	state.search.focus();
+	const selected = state.buttons.find((button) => button.dataset.value === state.select.value);
+	const selectedIndex = selected ? visibleButtons(state).indexOf(selected) : -1;
+	setActive(state, selectedIndex >= 0 ? selectedIndex : 0);
+	if (state.search.hidden) {
+		visibleButtons(state)[state.activeIndex]?.focus({ preventScroll: true });
+	} else {
+		state.search.focus();
+	}
 }
 
 function rebuild(state) {
@@ -155,6 +162,15 @@ function attach(select) {
 	trigger.className = 'combo-trigger';
 	trigger.setAttribute('aria-haspopup', 'listbox');
 	trigger.setAttribute('aria-expanded', 'false');
+	const labelText = select.closest('label')
+		? [...select.closest('label').childNodes]
+				.filter((node) => node.nodeType === 3)
+				.map((node) => node.textContent)
+				.join(' ')
+				.replace(/\s+/g, ' ')
+				.trim()
+		: '';
+	trigger.setAttribute('aria-label', select.getAttribute('aria-label') || labelText || select.name || 'Choose an option');
 	const value = document.createElement('span');
 	value.className = 'combo-value';
 	const caret = document.createElement('span');
@@ -176,6 +192,7 @@ function attach(select) {
 	search.spellcheck = false;
 	search.placeholder = select.dataset.comboPlaceholder || 'Search…';
 	search.setAttribute('aria-label', 'Search options');
+	if (!select.hasAttribute('data-searchable')) search.hidden = true;
 
 	const list = document.createElement('div');
 	list.className = 'combo-list';
@@ -216,10 +233,9 @@ function attach(select) {
 		else open(state);
 	});
 	trigger.addEventListener('keydown', (event) => {
-		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+		if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
 			event.preventDefault();
 			open(state);
-			setActive(state, event.key === 'ArrowDown' ? 0 : -1);
 		}
 	});
 	search.addEventListener('input', () => state.filterList());
@@ -244,6 +260,33 @@ function attach(select) {
 		}
 	});
 	panel.addEventListener('click', (event) => event.stopPropagation());
+	panel.addEventListener('keydown', (event) => {
+		if (!search.hidden) return;
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			setActive(state, state.activeIndex + 1);
+			visibleButtons(state)[state.activeIndex]?.focus({ preventScroll: true });
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			setActive(state, state.activeIndex - 1);
+			visibleButtons(state)[state.activeIndex]?.focus({ preventScroll: true });
+		} else if (event.key === 'Home' || event.key === 'End') {
+			event.preventDefault();
+			setActive(state, event.key === 'Home' ? 0 : visibleButtons(state).length - 1);
+			visibleButtons(state)[state.activeIndex]?.focus({ preventScroll: true });
+		} else if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			const options = visibleButtons(state);
+			const active = options[state.activeIndex] || options[0];
+			if (active) choose(state, active.dataset.value);
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			closeOpen();
+			trigger.focus();
+		} else if (event.key === 'Tab') {
+			closeOpen();
+		}
+	});
 	select.addEventListener('change', () => state.syncTrigger());
 
 	rebuild(state);
@@ -251,7 +294,8 @@ function attach(select) {
 }
 
 export function enhanceSelect(select) {
-	if (!select || select.dataset.comboReady === '1') {
+	if (!select || select.multiple || select.size > 1) return;
+	if (select.dataset.comboReady === '1') {
 		refreshSelect(select);
 		return;
 	}
@@ -268,15 +312,15 @@ export function refreshSelect(select) {
 
 export function refreshSelects(root = document) {
 	if (!root?.querySelectorAll) return;
-	if (root.matches?.('select[data-searchable]')) refreshSelect(root);
-	for (const select of root.querySelectorAll('select[data-searchable]')) refreshSelect(select);
+	if (root.matches?.('select[data-combo-ready="1"]')) refreshSelect(root);
+	for (const select of root.querySelectorAll('select[data-combo-ready="1"]')) refreshSelect(select);
 }
 
 export function enhanceSelects(root = document) {
 	if (!root?.querySelectorAll) return;
 	if (openState && !document.contains(openState.trigger)) closeOpen();
-	if (root.matches?.('select[data-searchable]')) enhanceSelect(root);
-	for (const select of root.querySelectorAll('select[data-searchable]')) enhanceSelect(select);
+	if (root.matches?.('select')) enhanceSelect(root);
+	for (const select of root.querySelectorAll('select')) enhanceSelect(select);
 }
 
 if (typeof document !== 'undefined') {

@@ -17,14 +17,14 @@ import {
 } from './shared.js';
 
 function activityBadge(transaction) {
+	if (transaction.type === 'transfer') {
+		return `<span class="cat-badge cat-badge-transfer" style="--cat:#0f6e79">${icon('refresh')}</span>`;
+	}
 	if (transaction.type === 'interest') {
 		return `<span class="cat-badge cat-badge-interest" style="--cat:#0d9488">${icon('trendUp')}</span>`;
 	}
 	if (transaction.type === 'goal_deposit' || transaction.type === 'goal_withdrawal') {
 		return `<span class="cat-badge cat-badge-goal" style="--cat:#7c3aed">${icon('target')}</span>`;
-	}
-	if (transaction.type === 'transfer') {
-		return `<span class="cat-badge" style="--cat:#2563eb">${icon('transfer')}</span>`;
 	}
 	if (transaction.type === 'income') {
 		return `<span class="cat-badge cat-badge-income" style="--cat:#16a34a">${icon('arrowDown')}</span>`;
@@ -34,25 +34,28 @@ function activityBadge(transaction) {
 
 function activityRow(transaction, methods) {
 	const method = methods.find((row) => Number(row.id) === Number(transaction.paymentMethodId));
-	const target = methods.find((row) => Number(row.id) === Number(transaction.toPaymentMethodId));
+	const destination = methods.find(
+		(row) => Number(row.id) === Number(transaction.toPaymentMethodId)
+	);
 	const out = transaction.type === 'expense' || transaction.type === 'goal_deposit';
+	const isTransfer = transaction.type === 'transfer';
 	const label =
 		transaction.type === 'interest'
 			? 'Interest earned'
-			: transaction.type === 'goal_deposit'
-				? transaction.merchant
-				: transaction.type === 'goal_withdrawal'
+			: isTransfer
+				? 'Move money'
+				: transaction.type === 'goal_deposit'
 					? transaction.merchant
-					: transaction.type === 'transfer'
-						? 'Account transfer'
+					: transaction.type === 'goal_withdrawal'
+						? transaction.merchant
 						: transaction.merchant;
 	const detail =
 		transaction.type === 'expense'
 			? `${categoryLabel(transaction.category)}${method ? ` · ${method.label}` : ''}`
-			: transaction.type === 'transfer'
-				? `${method ? method.label : 'Account'} → ${target ? target.label : 'Account'}`
-				: transaction.type === 'interest'
-					? `${method ? method.label : 'Payment method'} · automatic`
+			: transaction.type === 'interest'
+				? `${method ? method.label : 'Payment method'} · automatic`
+				: isTransfer
+					? `${method ? method.label : 'Source'} → ${destination ? destination.label : 'Destination'}`
 					: `${method ? method.label : 'No method'}`;
 	return `<li class="activity-row">
 		${activityBadge(transaction)}
@@ -60,8 +63,8 @@ function activityRow(transaction, methods) {
 			<strong>${esc(label)}</strong>
 			<span class="sub">${esc(detail)}</span>
 		</div>
-		<div class="activity-amount ${transaction.type === 'transfer' ? 'move' : out ? 'out' : 'in'}">${
-			transaction.type === 'transfer' ? '⇄ ' : out ? '−' : '+'
+		<div class="activity-amount ${isTransfer ? 'transfer' : out ? 'out' : 'in'}">${
+			isTransfer ? '↔ ' : out ? '−' : '+'
 		}${esc(formatMoney(transaction.amountCents, 'PHP'))}</div>
 	</li>`;
 }
@@ -156,6 +159,13 @@ export function homeView({
 		${sparkDays >= 2 ? sparkline(sparkSeries, { width: 340, height: 62 }) : ''}
 	</section>
 
+	<section class="quick-actions">
+		<button class="quick-action" type="button" data-action="new-expense">${icon('receipt')}<span>Log expense</span></button>
+		<button class="quick-action" type="button" data-action="new-transfer">${icon('transfer')}<span>Move money</span></button>
+		<button class="quick-action" type="button" data-action="new-goal">${icon('target')}<span>New goal</span></button>
+		<a class="quick-action" href="#/insights">${icon('sparkles')}<span>Ask the analyst</span></a>
+	</section>
+
 	<section class="section-block">
 		<div class="section-head">
 			<h2>Your cards</h2>
@@ -246,12 +256,5 @@ export function homeView({
 			</div>
 			${upcomingList(subscriptionSummary || { overdue: [], dueSoon: [] })}
 		</section>
-	</div>
-
-	<section class="quick-actions">
-		<button class="quick-action" type="button" data-action="new-expense">${icon('receipt')}<span>Log expense</span></button>
-		<button class="quick-action" type="button" data-action="new-goal">${icon('target')}<span>New goal</span></button>
-		<button class="quick-action" type="button" data-action="new-transfer">${icon('transfer')}<span>Transfer money</span></button>
-		<a class="quick-action" href="#/insights">${icon('sparkles')}<span>Ask the analyst</span></a>
-	</section>`;
+	</div>`;
 }

@@ -6,12 +6,40 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-1.5](https://github.com/markusknave/renewly/releases/tag/beta-1.5),
+[beta-2.1](https://github.com/markusknave/renewly/releases/tag/beta-2.1),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-1.5.apk
+renewly-beta-2.1.apk
 ```
+
+## What is new in beta-2.1
+
+- **Transfers work across every account type.** Debit cards, credit cards,
+  prepaid cards, bank accounts, e-wallets, credit/BNPL lines, and cash can all
+  be a source or destination. A debit-to-e-wallet transfer lowers the debit and
+  raises the wallet by the same amount; the total across accounts never changes.
+- **Transfers in imports.** The preview now shows **From** and **To** account
+  pickers for transfer rows. A row that names only one side can use the default
+  source, and a transfer that still lacks two distinct accounts is rejected
+  instead of becoming a fake expense.
+- **Focused dropdowns.** Every select opens a list anchored to the field, moves
+  keyboard focus into the list, highlights the current value, and scrolls it into
+  view. Account, provider, plan, and time-zone lists keep their search field.
+- **Grouped navigation.** The mobile bar is Home, Activity, Cards, Plan, and
+  More. More is split into Daily money, Recurring, Tools, and App, so Goals,
+  Insights, import, groups, the plan catalog, appearance, and settings are one
+  step away.
+- **Five themes and ten fonts.** Ivory, Linen, Bloom, Tide, and Midnight ship
+  with complete palettes. Custom lets you choose the accent and background;
+  contrast is derived automatically. Poppins, Inter, Roboto, Open Sans,
+  Montserrat, Lato, Nunito Sans, DM Sans, Work Sans, and Manrope are bundled for
+  offline use.
+- **Issuer-accurate card colours.** Existing layouts stay, debit cards use
+  everyday brand colours, credit cards use darker premium finishes, and
+  e-wallets and credit/BNPL providers keep their own brand colours.
+- **Minimalist redesign.** Quieter paper surfaces, larger type, softer cards,
+  stronger hierarchy, and one primary action per screen.
 
 ## What is new in beta-1.5
 
@@ -123,8 +151,8 @@ renewly-beta-1.5.apk
 
 ### Expenses and balances
 
-- Add an expense or income entry with date, description, amount, category,
-  notes, and payment method.
+- Add an expense, income entry, or account transfer with date, description,
+  amount, category, notes, and payment method.
 - Move money between any two saved accounts with a transfer, including bank to
   e-wallet and e-wallet to bank. The source is debited, the destination is
   credited, and the transfer is excluded from expense and income totals. The
@@ -191,6 +219,9 @@ renewly-beta-1.5.apk
 
 - Cards, e-wallets, bank accounts, credit / BNPL accounts, cash, and other
   accounts.
+- Transfers can connect any two saved account types: debit card to e-wallet,
+  credit to debit, bank to cash, or two accounts of the same type. The source
+  balance falls, the destination rises, and the total stays the same.
 - The payment-method type is **Bank account** (not "bank transfer"); transfers
   are separate ledger entries and can connect any two account types.
 - Credit / BNPL providers include Atome, BillEase, Home Credit, Salmon, Tala,
@@ -239,6 +270,18 @@ renewly-beta-1.5.apk
   transfers in that range; income stays positive, expenses are negative, and
   transfers show `Source → Destination` without affecting the totals.
 
+### Appearance
+
+- Five themes: Ivory, Linen, Bloom, Tide, and Midnight.
+- Custom theme with an accent colour and background colour; text, surfaces, and
+  borders are derived for readable contrast.
+- Ten bundled Google Fonts: Poppins, Inter, Roboto, Open Sans, Montserrat, Lato,
+  Nunito Sans, DM Sans, Work Sans, and Manrope. They work offline.
+- Every dropdown opens a focused list anchored to its field, highlights the
+  current value, and supports keyboard navigation. Account, provider, plan, and
+  time-zone lists also offer search.
+- Changes apply immediately and are saved in the settings record.
+
 ### Subscriptions
 
 - Recurring subscriptions and one-time deals that expire.
@@ -271,24 +314,30 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-1.5.apk
+adb install -r renewly-beta-2.1.apk
 ```
+
+### Updating from beta-1.5
+
+Install beta-2.1 over beta-1.5. It uses the same signing key and IndexedDB
+schema version 3, so no uninstall or backup restore is required. Themes and
+transfer fixes use the existing settings and transaction stores.
 
 ### Updating from beta-1.4
 
-Install beta-1.5 over beta-1.4. It uses the same signing key and the same
+Install beta-2.1 over beta-1.4. It uses the same signing key and the same
 IndexedDB schema version 3, so no uninstall or backup restore is required. JSON
-backup format 5 still imports and now accepts Credit / BNPL accounts.
+backup format 5 still imports and accepts Credit / BNPL accounts.
 
 ### Updating from beta-1.3
 
-Install beta-1.5 over beta-1.3. It uses the same signing key and the same
+Install beta-2.1 over beta-1.3. It uses the same signing key and the same
 IndexedDB schema version 3, so no uninstall or backup restore is required. The
-JSON backup format moves to version 5; beta-1.5 imports versions 1 through 5.
+JSON backup format stays at version 5; beta-2.1 imports versions 1 through 5.
 
 ### Updating from beta-1.2-hotfix
 
-Install beta-1.5 over beta-1.2-hotfix. It uses the same rotated signing key and
+Install beta-2.1 over beta-1.2-hotfix. It uses the same rotated signing key and
 the same IndexedDB schema, so no uninstall or backup restore is required.
 
 ### Updating from beta-1.2 or earlier
@@ -299,7 +348,7 @@ different signer, so it will reject an in-place update with
 
 1. Export a JSON backup from **More → Settings**.
 2. Uninstall Renewly once.
-3. Install `renewly-beta-1.5.apk`.
+3. Install `renewly-beta-2.1.apk`.
 4. Restore the JSON backup.
 
 The new certificate SHA-256 fingerprint is:
@@ -311,30 +360,15 @@ The new certificate SHA-256 fingerprint is:
 Verify it with:
 
 ```bash
-apksigner verify --print-certs renewly-beta-1.5.apk
+apksigner verify --print-certs renewly-beta-2.1.apk
 ```
 
 ### Updating from beta-1.1
 
-Installing beta-1.5 over beta-1.1 keeps the IndexedDB database, but the
+Installing beta-2.1 over beta-1.1 keeps the IndexedDB database, but the
 signing key changed. Follow the one-time reinstall steps above. There is no
 schema change; the import feature only adds rows through the existing expense
 store.
-
-### Updating from beta-0.3
-
-Installing beta-1.5 over beta-0.3 keeps the IndexedDB database, but the
-signing key changed, so follow the one-time reinstall steps above. The schema
-moves from version 2 to version 3, which only adds the `transactions` and
-`goals` stores; existing subscriptions, groups, payment methods, and settings
-are left alone.
-
-### Updating from beta-0.1 or beta-0.2
-
-beta-0.2 through beta-1.2 used the retired beta key. beta-0.1 builds used a
-runner-generated debug key. If Android rejects the install with a signature
-mismatch, export your data first, uninstall once, then install
-beta-1.5 and import the JSON backup.
 
 ## Run it locally
 
@@ -391,8 +425,8 @@ See [docs/ANDROID.md](docs/ANDROID.md) for SDK setup and troubleshooting.
   saved to Files, Drive, or another app; in a browser it uses the save picker or
   a normal download.
 - Import accepts a file or pasted JSON and replaces all data on the device.
-  Backups from beta-0.1 through beta-0.3 still import; older files simply have no
-  ledger or goals.
+  Older backups still import; files written before the ledger existed simply
+  have no transactions or goals.
 - Subscription names, `Tracked for` labels, and group names are limited to 25
   characters. Expense descriptions are limited to 60, goal names to 40, and
   notes to 500.
@@ -482,17 +516,19 @@ public/
   js/notifications.js    Capacitor local-notification bridge
   js/views.js            view barrel
   js/views/              dashboard, expenses, goals, insights, import, cards,
-                         more, subscriptions, shared helpers
+                         more, appearance, subscriptions, shared helpers
   js/lib/dates.js        date, money, and cadence helpers
   js/lib/providers.js    Philippine banks, wallets, and credit providers
-  js/lib/combobox.js     searchable select enhancement for long pickers
+  js/lib/combobox.js     focused, searchable select enhancement
+  js/lib/themes.js       five palettes, custom colours, ten bundled fonts
   js/lib/categories.js   expense categories, colors, icons, keywords
-  js/lib/cardThemes.js   stylised Philippine card themes
+  js/lib/cardThemes.js   stylised PH card themes and instrument finishes
   js/lib/timezones.js    IANA zone list with current UTC offsets
+  fonts/                 local WOFF2 files and @font-face rules
   data/plans.json        PH plan catalog
   vendor/tesseract/      bundled OCR engine, LSTM core, and English model
   sw.js                  offline shell cache
-  styles.css             UI
+  styles.css             appearance-driven design system
 scripts/
   serve.mjs              local static server
   refresh-plans.mjs      catalog refresh/drift report

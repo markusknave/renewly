@@ -190,6 +190,7 @@ export function expensesView({
 		</div>
 		<div class="page-head-actions">
 			<a class="btn" href="#/import">${icon('download')} Import</a>
+			<button class="btn" type="button" data-action="new-transfer">${icon('transfer')} Transfer money</button>
 			<button class="btn btn-primary" type="button" data-action="new-expense">${icon('plus')} Add transaction</button>
 		</div>
 	</div>

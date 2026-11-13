@@ -1,5 +1,6 @@
 import { CATEGORY_KEYS, INCOME_CATEGORY } from './lib/categories.js';
 import { INSTRUMENTS, instrumentFor } from './lib/cardThemes.js';
+import { DEFAULT_APPEARANCE, FONT_IDS, THEME_IDS, normalizeHex } from './lib/themes.js';
 import {
 	INTEREST_FREQUENCIES,
 	TRANSACTION_TYPES,
@@ -30,6 +31,10 @@ const DEFAULT_SETTINGS = {
   currency: 'PHP',
   timezone: 'Asia/Manila',
   reminderDays: [7, 3, 1],
+  theme: DEFAULT_APPEARANCE.theme,
+  font: DEFAULT_APPEARANCE.font,
+  customAccent: DEFAULT_APPEARANCE.customAccent,
+  customBackground: DEFAULT_APPEARANCE.customBackground,
 };
 
 // Subscription and group names are capped at 25 characters: longer labels
@@ -609,7 +614,15 @@ function sanitizeSettings(value, base) {
     ? [...new Set(source.reminderDays.filter((day) => Number.isInteger(day) && day >= 0))].sort((a, b) => a - b)
     : [...base.reminderDays];
 
-  return { currency, timezone, reminderDays };
+  return {
+    currency,
+    timezone,
+    reminderDays,
+    theme: THEME_IDS.includes(source.theme) ? source.theme : base.theme,
+    font: FONT_IDS.includes(source.font) ? source.font : base.font,
+    customAccent: normalizeHex(source.customAccent, base.customAccent),
+    customBackground: normalizeHex(source.customBackground, base.customBackground),
+  };
 }
 
 export async function getSettings(db) {
@@ -650,6 +663,24 @@ export async function saveSettings(db, patch) {
       days.push(day);
     }
     next.reminderDays = [...new Set(days)].sort((a, b) => a - b);
+  }
+
+  if (patch.theme !== undefined) {
+    if (!THEME_IDS.includes(patch.theme)) throw new Error('Theme is not recognized.');
+    next.theme = patch.theme;
+  }
+
+  if (patch.font !== undefined) {
+    if (!FONT_IDS.includes(patch.font)) throw new Error('Font is not recognized.');
+    next.font = patch.font;
+  }
+
+  if (patch.customAccent !== undefined) {
+    next.customAccent = normalizeHex(patch.customAccent, next.customAccent);
+  }
+
+  if (patch.customBackground !== undefined) {
+    next.customBackground = normalizeHex(patch.customBackground, next.customBackground);
   }
 
   await db.put('settings', { key: 'profile', value: next });

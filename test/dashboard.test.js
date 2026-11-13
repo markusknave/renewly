@@ -283,6 +283,61 @@ test('import review renders the drop zone, analyst summary, and commit form', ()
 	assert.match(html, /Analyst top category/);
 });
 
+test('import preview lets a transfer use the default source account', () => {
+	const html = importView({
+		methods,
+		defaultMethodId: 1,
+		preview: {
+			fileName: 'transfers.csv',
+			format: 'CSV',
+			rows: [
+				{
+					type: 'transfer',
+					date: '2026-11-02',
+					merchant: 'InstaPay to GCash',
+					amountCents: 150_000,
+					category: 'other',
+					notes: '',
+					paymentMethodId: null,
+					transferMethodId: 2,
+					methodLabel: '',
+					duplicate: false,
+				},
+			],
+			stats: {
+				total: 1,
+				valid: 1,
+				invalid: 0,
+				duplicates: 0,
+				expenseCount: 0,
+				incomeCount: 0,
+				transferCount: 1,
+				expenseCents: 0,
+				incomeCents: 0,
+				transferCents: 150_000,
+			},
+			warnings: [],
+			analysis: {
+				count: 1,
+				expenseCount: 0,
+				incomeCount: 0,
+				transferCount: 1,
+				expenseCents: 0,
+				incomeCents: 0,
+				transferCents: 150_000,
+				netCents: 0,
+				categories: [],
+				from: '2026-11-02',
+				to: '2026-11-02',
+			},
+		},
+	});
+	assert.match(html, /data-import-transfer-source/);
+	assert.match(html, /data-import-transfer /);
+	assert.match(html, /Import 1 transaction/);
+	assert.doesNotMatch(html, /Needs account/);
+});
+
 test('import screen explains supported formats before a file is chosen', () => {
 	const html = importView({ methods, preview: null });
 	assert.match(html, /CSV, PDF, Excel/);

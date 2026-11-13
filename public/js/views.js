@@ -44,3 +44,4 @@ export { goalDialog, goalsView, transferDialog } from './views/goals.js';
 export { insightsView } from './views/insights.js';
 export { importView } from './views/import.js';
 export { moreView } from './views/more.js';
+export { appearanceView } from './views/appearance.js';

@@ -7,32 +7,46 @@ import { PAYMENT_KIND_LABELS } from '../store.js';
 import { IMPORT_ACCEPT } from '../import.js';
 import { breadcrumb, esc, icon } from './shared.js';
 
-function statusPill(row) {
+function statusPill(row, defaultMethodId = null) {
 	if (row.duplicate) return '<span class="pill pill-paused">Duplicate</span>';
-	if (row.type === 'transfer' && !row.transferMethodId) {
+	const source = row.paymentMethodId ?? defaultMethodId;
+	if (row.type === 'transfer' && (!row.transferMethodId || !source)) {
 		return '<span class="pill pill-paused">Needs account</span>';
 	}
 	return '<span class="pill pill-active">Ready</span>';
 }
 
-function transferOptions(row, methods) {
-	return `<select class="import-transfer-select" data-import-transfer data-index="${
-		row.index
-	}" data-searchable data-combo-placeholder="Search accounts…" aria-label="Other transfer account">
-		<option value="">Other account…</option>
-		${methods
-			.filter((method) => String(method.id) !== String(row.paymentMethodId ?? ''))
-			.map(
-				(method) =>
-					`<option value="${method.id}"${
-						String(row.transferMethodId) === String(method.id) ? ' selected' : ''
-					}>${esc(method.label)}</option>`
-			)
-			.join('')}
-	</select>`;
+function accountOptions(methods, selected, excludeId = null) {
+	return methods
+		.filter((method) => String(method.id) !== String(excludeId ?? ''))
+		.map(
+			(method) =>
+				`<option value="${method.id}"${
+					String(selected) === String(method.id) ? ' selected' : ''
+				}>${esc(method.label)}</option>`
+		)
+		.join('');
 }
 
-function previewRows(rows, methods) {
+function transferOptions(row, methods, defaultMethodId = null) {
+	const source = row.paymentMethodId ?? defaultMethodId ?? '';
+	return `<div class="transfer-pair">
+		<select class="import-transfer-select" data-import-transfer-source data-index="${
+			row.index
+		}" data-searchable data-combo-placeholder="Search source…" aria-label="Transfer source account">
+			<option value="">From account…</option>
+			${accountOptions(methods, source)}
+		</select>
+		<select class="import-transfer-select" data-import-transfer data-index="${
+			row.index
+		}" data-searchable data-combo-placeholder="Search destination…" aria-label="Transfer destination account">
+			<option value="">To account…</option>
+			${accountOptions(methods, row.transferMethodId, source)}
+		</select>
+	</div>`;
+}
+
+function previewRows(rows, methods, defaultMethodId = null) {
 	if (!rows.length) return '<p class="muted small">No transaction rows were recognized.</p>';
 	return `<div class="table-wrap"><table class="subs-table import-table">
 		<thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Category</th><th>Account</th><th>Amount</th><th>Status</th></tr></thead>
@@ -50,13 +64,15 @@ function previewRows(rows, methods) {
 						<option value="transfer"${row.type === 'transfer' ? ' selected' : ''}>Transfer</option>
 					</select></td>
 					<td>${esc(categoryLabel(row.category))}</td>
-					<td>${esc(row.methodLabel || 'Default')}${
-						row.type === 'transfer' ? transferOptions({ ...row, index }, methods) : ''
+					<td>${
+						row.type === 'transfer'
+							? transferOptions({ ...row, index }, methods, defaultMethodId)
+							: esc(row.methodLabel || 'Default')
 					}</td>
 					<td class="num">${
 						row.type === 'income' ? '+' : row.type === 'transfer' ? '⇄ ' : '−'
 					}${esc(formatMoney(row.amountCents, 'PHP'))}</td>
-					<td>${statusPill(row)}</td>
+					<td>${statusPill(row, defaultMethodId)}</td>
 				</tr>`
 			)
 			.join('')}</tbody>
@@ -92,7 +108,10 @@ export function importView({ methods = [], preview = null, busy = false, default
 	const ready = rows.filter(
 		(row) =>
 			!row.duplicate &&
-			!(row.type === 'transfer' && (!row.transferMethodId || !row.paymentMethodId))
+			!(
+				row.type === 'transfer' &&
+				(!row.transferMethodId || (!row.paymentMethodId && !defaultMethodId))
+			)
 	).length;
 	const duplicateCount = rows.filter((row) => row.duplicate).length;
 	const stats = preview?.stats || null;
@@ -180,8 +199,8 @@ export function importView({ methods = [], preview = null, busy = false, default
 							<button class="btn" type="button" data-action="clear-import">Clear</button>
 						</div>
 					</div>
-					<p class="hint">The analyst matched categories from the description and notes. Use the Type column to correct a row before importing; transfers need the other account selected in the Account column. Unmatched account names can be created with the checkbox above. You can also edit any imported transaction afterward.</p>
-					${previewRows(rows, methods)}
+					<p class="hint">The analyst matched categories from the description and notes. Use the Type column to correct a row before importing; transfers need a From and To account in the Account column. Unmatched account names can be created with the checkbox above. You can also edit any imported transaction afterward.</p>
+					${previewRows(rows, methods, defaultMethodId)}
 					${
 						rows.length > 100
 							? `<p class="muted tiny">Showing the first 100 of ${rows.length} rows. All ready rows will be imported.</p>`

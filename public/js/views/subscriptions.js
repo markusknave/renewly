@@ -3,6 +3,7 @@
 import { CADENCE_LABELS, formatDateHuman, formatMoney } from '../lib/dates.js';
 import { catalogCategories } from '../catalog.js';
 import { timezoneOptions } from '../lib/timezones.js';
+import { DEFAULT_APPEARANCE, FONTS, THEMES } from '../lib/themes.js';
 import {
 	MAX_DISPLAY_NAME,
 	MAX_GROUP_NAME_LENGTH,
@@ -10,7 +11,7 @@ import {
 	summarizeGroups,
 	UNGROUPED_LABEL,
 } from '../store.js';
-import { breadcrumb, esc, options, relative, subscriptionRows } from './shared.js';
+import { breadcrumb, esc, icon, options, relative, subscriptionRows } from './shared.js';
 
 function categoryLabel(category) {
 	return String(category || 'Other')
@@ -512,6 +513,8 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 				catalog.region
 			)}`
 		: 'Catalog unavailable';
+	const theme = THEMES.find((entry) => entry.id === (settings.theme || DEFAULT_APPEARANCE.theme));
+	const font = FONTS.find((entry) => entry.id === (settings.font || DEFAULT_APPEARANCE.font));
 	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Settings' }])}<div class="page-head"><div><p class="eyebrow">More</p><h1>Settings</h1><p class="muted">Everything is stored in this browser profile on this device.</p></div></div>
 	<section class="panel">
 		<div class="panel-head"><h2>Profile</h2></div>
@@ -528,6 +531,13 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 			</div>
 			<div class="form-actions"><button class="btn btn-primary" type="submit">Save settings</button></div>
 		</form>
+	</section>
+	<section class="panel">
+		<div class="panel-head"><h2>Appearance</h2><a class="link" href="#/appearance">Change</a></div>
+		<p class="muted small">${esc(theme?.name || 'Ivory')} theme · ${esc(
+			font?.name || 'Poppins'
+		)} font. Pick from five palettes or set your own accent and background.</p>
+		<a class="btn" href="#/appearance">${icon('sparkles')} Open appearance</a>
 	</section>
 	<section class="panel">
 		<div class="panel-head"><h2>Notifications</h2></div>
