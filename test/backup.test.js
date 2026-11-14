@@ -25,6 +25,7 @@ import {
 	saveSettings,
 	saveSubscription,
 } from '../public/js/store.js';
+import { setCustomCategories } from '../public/js/lib/categories.js';
 
 function input(overrides = {}) {
 	return {
@@ -94,6 +95,7 @@ test('export/import round-trips groups, methods, owners, and settings', async ()
 		font: 'poppins',
 		customAccent: '#6d4aff',
 		customBackground: '#f7f3ec',
+		customCategories: [],
 	});
 });
 
@@ -224,7 +226,7 @@ test('version 4 backups round-trip ledger entries, goals, and card interest sett
 		})
 	);
 	const parsed = JSON.parse(text);
-	assert.equal(parsed.version, 5);
+	assert.equal(parsed.version, 6);
 	assert.equal(parsed.paymentMethods[0].interestRateBps, 325);
 	assert.equal(parsed.paymentMethods[0].instrument, 'debit');
 	assert.equal(parsed.goals[0].name, 'Japan trip');
@@ -247,4 +249,52 @@ test('version 4 backups round-trip ledger entries, goals, and card interest sett
 	assert.equal(transactions.length, 2);
 	assert.ok(transactions.every((row) => row.paymentMethodId === importedMethod.id));
 	assert.equal(transactions.find((row) => row.type === 'goal_deposit').goalId, importedGoal.id);
+});
+
+test('backups carry custom categories and keep their ledger keys', async () => {
+	const source = createMemoryBackend();
+	const method = await savePaymentMethod(source, { label: 'GCash', kind: 'ewallet' });
+	const coffee = { key: 'custom-coffee-runs', label: 'Coffee runs', type: 'expense', color: '#2563eb', icon: 'coffee' };
+	const sideGig = { key: 'custom-side-gig', label: 'Side gig', type: 'income', color: '#0d9488', icon: 'wallet' };
+	await saveSettings(source, { customCategories: [coffee, sideGig] });
+	setCustomCategories([coffee, sideGig]);
+
+	await saveExpense(source, {
+		type: 'expense',
+		date: '2026-11-14',
+		merchant: 'Kape Corner',
+		amountCents: 18_550,
+		category: coffee.key,
+		paymentMethodId: method.id,
+	});
+	await saveExpense(source, {
+		type: 'income',
+		date: '2026-11-14',
+		merchant: 'Editorial work',
+		amountCents: 500_000,
+		category: sideGig.key,
+		paymentMethodId: method.id,
+	});
+
+	const text = serializeExport(
+		buildExport({
+			settings: await getSettings(source),
+			groups: [],
+			paymentMethods: await listPaymentMethods(source),
+			subscriptions: [],
+			goals: [],
+			transactions: await listTransactions(source),
+		})
+	);
+	const normalized = normalizeBackup(parseBackup(text));
+	assert.deepEqual(normalized.settings.customCategories.map((row) => row.key), [coffee.key, sideGig.key]);
+	assert.equal(
+		normalized.transactions.find((row) => row.type === 'expense').category,
+		coffee.key
+	);
+	assert.equal(
+		normalized.transactions.find((row) => row.type === 'income').category,
+		sideGig.key
+	);
+	setCustomCategories([]);
 });

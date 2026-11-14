@@ -1,4 +1,8 @@
-import { CATEGORY_KEYS, INCOME_CATEGORY } from './lib/categories.js';
+import {
+  INCOME_CATEGORY,
+  isCategoryKey,
+  normalizeCustomCategories,
+} from './lib/categories.js';
 import { INSTRUMENTS, instrumentFor } from './lib/cardThemes.js';
 import { DEFAULT_APPEARANCE, FONT_IDS, THEME_IDS, normalizeHex } from './lib/themes.js';
 import {
@@ -35,6 +39,7 @@ const DEFAULT_SETTINGS = {
   font: DEFAULT_APPEARANCE.font,
   customAccent: DEFAULT_APPEARANCE.customAccent,
   customBackground: DEFAULT_APPEARANCE.customBackground,
+  customCategories: [],
 };
 
 // Subscription and group names are capped at 25 characters: longer labels
@@ -622,6 +627,7 @@ function sanitizeSettings(value, base) {
     font: FONT_IDS.includes(source.font) ? source.font : base.font,
     customAccent: normalizeHex(source.customAccent, base.customAccent),
     customBackground: normalizeHex(source.customBackground, base.customBackground),
+    customCategories: normalizeCustomCategories(source.customCategories),
   };
 }
 
@@ -681,6 +687,13 @@ export async function saveSettings(db, patch) {
 
   if (patch.customBackground !== undefined) {
     next.customBackground = normalizeHex(patch.customBackground, next.customBackground);
+  }
+
+  if (patch.customCategories !== undefined) {
+    if (!Array.isArray(patch.customCategories)) {
+      throw new Error('Custom categories must be a list.');
+    }
+    next.customCategories = normalizeCustomCategories(patch.customCategories);
   }
 
   await db.put('settings', { key: 'profile', value: next });
@@ -821,12 +834,13 @@ export function validateExpenseInput(input) {
     errors.merchant = `Description must be ${MAX_EXPENSE_MERCHANT} characters or fewer.`;
   }
 
+  const rawCategory = trimString(source.category);
   const category = type === 'income'
-    ? INCOME_CATEGORY
+    ? isCategoryKey('income', rawCategory) ? rawCategory : INCOME_CATEGORY
     : type === 'transfer'
       ? 'other'
-      : trimString(source.category) || 'other';
-  if (type === 'expense' && !CATEGORY_KEYS.includes(category)) {
+      : isCategoryKey('expense', rawCategory) ? rawCategory : 'other';
+  if (type === 'expense' && rawCategory && !isCategoryKey('expense', rawCategory)) {
     errors.category = 'Category is not recognized.';
   }
 

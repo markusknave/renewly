@@ -316,7 +316,7 @@ test('JSON backups preserve both sides of a transfer', async () => {
 		})
 	);
 	const parsed = JSON.parse(text);
-	assert.equal(parsed.version, 5);
+	assert.equal(parsed.version, 6);
 	assert.equal(parsed.transactions[0].toPaymentMethodId, maya.id);
 
 	const target = createMemoryBackend();

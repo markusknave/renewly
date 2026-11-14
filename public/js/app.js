@@ -12,7 +12,12 @@ import { CUSTOM_PROVIDER } from './lib/providers.js';
 import { instrumentFor } from './lib/cardThemes.js';
 import { findPlan, findPlatform, loadCatalog } from './catalog.js';
 import { formatMoney, parseNumericAmount, todayInTz } from './lib/dates.js';
-import { EXPENSE_CATEGORIES } from './lib/categories.js';
+import {
+	buildCustomCategory,
+	categoryLabel,
+	isCategoryKey,
+	setCustomCategories,
+} from './lib/categories.js';
 import { applyAppearance, DEFAULT_APPEARANCE } from './lib/themes.js';
 import * as views from './views.js';
 
@@ -44,6 +49,7 @@ const state = {
 	importPreview: null,
 	importBusy: false,
 	importDefaultMethodId: null,
+	importOpen: false,
 	scanBusy: false,
 	scanObjectUrl: null,
 };
@@ -124,6 +130,7 @@ async function reload() {
 	state.goals = await store.listGoals(state.db);
 	state.transactions = await store.listTransactions(state.db);
 	state.settings = await store.getSettings(state.db);
+	setCustomCategories(state.settings.customCategories);
 	applyAppearance(state.settings);
 	if (
 		state.groupFilter
@@ -170,9 +177,9 @@ function filterTransactions(range) {
 		if (!finance.inRange(transaction, range.from, range.to)) return false;
 		if (state.filters.type && transaction.type !== state.filters.type) return false;
 		if (
-			state.filters.category &&
-			transaction.type === 'expense' &&
-			transaction.category !== state.filters.category
+			state.filters.category
+			&& (transaction.type === 'expense' || transaction.type === 'income')
+			&& transaction.category !== state.filters.category
 		) {
 			return false;
 		}
@@ -202,6 +209,11 @@ function greeting() {
 async function render() {
 	const token = ++renderToken;
 	const route = parseRoute();
+	if (route.name === 'import') {
+		state.importOpen = true;
+		history.replaceState(null, '', '#/expenses');
+		route.name = 'expenses';
+	}
 	document.body.dataset.route = route.name;
 	const flash = state.flash;
 	state.flash = null;
@@ -279,7 +291,9 @@ async function render() {
 			range,
 			summary: filteredSummary,
 			rows: filtered,
-			categories: EXPENSE_CATEGORIES,
+			importPreview: state.importPreview,
+			importBusy: state.importBusy,
+			importDefaultMethodId: state.importDefaultMethodId ?? state.methods[0]?.id ?? null,
 		});
 	} else if (route.name === 'goals') {
 		body = views.goalsView({
@@ -295,13 +309,6 @@ async function render() {
 			goalRows,
 			chat: state.chat,
 			methods: state.methods,
-		});
-	} else if (route.name === 'import') {
-		body = views.importView({
-			methods: state.methods,
-			preview: state.importPreview,
-			busy: state.importBusy,
-			defaultMethodId: state.importDefaultMethodId ?? state.methods[0]?.id ?? null,
 		});
 	} else if (route.name === 'more') {
 		body = views.moreView({
@@ -391,6 +398,9 @@ async function render() {
 	if (token !== renderToken) return;
 	app.innerHTML = banner(flash) + body;
 	views.enhanceSelects(app);
+	if (route.name === 'expenses' && state.importOpen) {
+		showDialog(document.getElementById('transaction-import-dialog'));
+	}
 	if (route.name === 'catalog') filterCatalog();
 	if (route.name === 'home' || route.name === 'subscriptions') maybeNotify(subscriptionSummary, iso);
 
@@ -577,6 +587,76 @@ function closeDialog(id) {
 	else dialog.removeAttribute('open');
 }
 
+// The category control is a button plus a hidden input, so the picker can show
+// icons without a native select.
+function setExpenseCategory(form, key) {
+	if (!form) return;
+	const type = form.elements.type?.value === 'income' ? 'income' : 'expense';
+	const fallback = type === 'income' ? 'income' : 'other';
+	const next = key && isCategoryKey(type, key) ? key : fallback;
+	const input = form.elements.category;
+	if (input) input.value = next;
+	const badge = form.querySelector('[data-category-badge]');
+	if (badge) badge.innerHTML = views.categoryBadge(next);
+	const name = form.querySelector('[data-category-name]');
+	if (name) name.textContent = categoryLabel(next);
+}
+
+let categoryTarget = null;
+let categoryScope = 'expense';
+let categorySelected = '';
+
+function showCategoryPicker() {
+	const dialog = document.getElementById('category-dialog');
+	const content = dialog?.querySelector('[data-category-content]');
+	const title = dialog?.querySelector('[data-category-title]');
+	if (title) title.textContent = 'Choose a category';
+	if (content) {
+		content.innerHTML = views.categoryPicker({
+			type: categoryScope,
+			selected: categorySelected,
+		});
+	}
+}
+
+function showCategoryForm() {
+	const dialog = document.getElementById('category-dialog');
+	const content = dialog?.querySelector('[data-category-content]');
+	const title = dialog?.querySelector('[data-category-title]');
+	if (title) title.textContent = 'New category';
+	if (content) {
+		content.innerHTML = views.categoryForm({ type: categoryScope, icon: 'dots' });
+		const input = content.querySelector('input[name="label"]');
+		if (input) setTimeout(() => input.focus(), 30);
+	}
+}
+
+function openCategoryDialog(form) {
+	if (!form) return;
+	const dialog = document.getElementById('category-dialog');
+	if (!dialog) return;
+	categoryTarget = form;
+	categoryScope = form.elements.type?.value === 'income' ? 'income' : 'expense';
+	categorySelected = form.elements.category?.value || '';
+	showCategoryPicker();
+	showDialog(dialog);
+}
+
+async function saveCategory(form) {
+	if (!categoryTarget) throw new Error('Open the entry form before adding a category.');
+	const fd = new FormData(form);
+	const category = buildCustomCategory({
+		label: fd.get('label'),
+		icon: String(fd.get('icon') || 'dots'),
+		type: form.dataset.type === 'income' ? 'income' : 'expense',
+	});
+	const next = [...(state.settings.customCategories || []), category];
+	state.settings = await store.saveSettings(state.db, { customCategories: next });
+	setCustomCategories(state.settings.customCategories);
+	setExpenseCategory(categoryTarget, category.key);
+	closeDialog('category-dialog');
+}
+
 function syncExpenseDialogType(form) {
 	if (!form) return;
 	const rawType = form.elements.type?.value;
@@ -594,8 +674,9 @@ function syncExpenseDialogType(form) {
 	const source = form.elements.paymentMethodId;
 	const editing = Boolean(form.dataset.id);
 
-	if (categoryField) categoryField.hidden = type !== 'expense';
-	if (category) category.disabled = type !== 'expense';
+	if (categoryField) categoryField.hidden = type === 'transfer';
+	if (category) category.disabled = type === 'transfer';
+	if (type !== 'transfer') setExpenseCategory(form, category?.value);
 	if (targetField) targetField.hidden = type !== 'transfer';
 	if (target) target.required = false;
 	if (merchant) merchant.required = type !== 'transfer';
@@ -674,11 +755,11 @@ function openExpenseDialog(id = null, requestedType = null) {
 					? requestedType
 					: 'expense';
 	form.elements.type.value = type;
+	setExpenseCategory(form, transaction?.category || (type === 'income' ? 'income' : 'other'));
 	if (transaction) {
 		form.dataset.id = transaction.id;
 		form.elements.amount.value = (transaction.amountCents / 100).toFixed(2);
 		form.elements.merchant.value = transaction.merchant || '';
-		form.elements.category.value = type === 'expense' ? transaction.category : 'other';
 		form.elements.notes.value = transaction.notes || '';
 	}
 	form.elements.date.value = transaction?.date || todayIso();
@@ -836,7 +917,7 @@ async function handleScanFile(file) {
 		if (parsed.date) form.elements.date.value = parsed.date;
 		if (parsed.amountCents) form.elements.amount.value = (parsed.amountCents / 100).toFixed(2);
 		if (parsed.merchant) form.elements.merchant.value = parsed.merchant;
-		if (parsed.type === 'expense' && parsed.category) form.elements.category.value = parsed.category;
+		if (parsed.type === 'expense' && parsed.category) setExpenseCategory(form, parsed.category);
 		if (parsed.notes) form.elements.notes.value = parsed.notes;
 		if (parsed.type === 'transfer') {
 			const current = form.elements.paymentMethodId.value;
@@ -867,6 +948,7 @@ async function handleScanFile(file) {
 async function handleImportFile(file) {
 	if (!file || state.importBusy) return;
 	state.importBusy = true;
+	state.importOpen = true;
 	state.flash = null;
 	await render();
 	try {
@@ -1135,6 +1217,10 @@ async function onSubmit(event) {
 	event.preventDefault();
 	const type = form.dataset.form;
 	try {
+		if (type === 'category') {
+			await saveCategory(form);
+			return;
+		}
 		if (type === 'subscription') {
 			const input = subscriptionInput(form);
 			const duplicate = store.findDuplicateSubscription(state.subscriptions, input);
@@ -1228,6 +1314,7 @@ async function onSubmit(event) {
 				);
 			}
 			state.importPreview = null;
+			state.importOpen = false;
 			state.flash = {
 				type: result.imported ? 'ok' : 'error',
 				message: result.imported
@@ -1341,7 +1428,31 @@ async function onClick(event) {
 			else if (action === 'close-import') closeImportDialog();
 			else if (action === 'clear-data') await clearData();
 			else if (action === 'new-expense') await newExpense();
+			else if (action === 'new-income') await newExpense('income');
 			else if (action === 'new-transfer') await newTransfer();
+			else if (action === 'open-import') {
+				state.importOpen = true;
+				showDialog(document.getElementById('transaction-import-dialog'));
+			}
+			else if (action === 'close-transaction-import') {
+				state.importOpen = false;
+				closeDialog('transaction-import-dialog');
+			}
+			else if (action === 'open-export') showDialog(document.getElementById('export-dialog'));
+			else if (action === 'close-export') closeDialog('export-dialog');
+			else if (action === 'export-backup') {
+				closeDialog('export-dialog');
+				await exportData();
+			}
+			else if (action === 'open-category') openCategoryDialog(trigger.closest('form'));
+			else if (action === 'close-category') closeDialog('category-dialog');
+			else if (action === 'pick-category') {
+				categorySelected = String(trigger.dataset.key || '');
+				setExpenseCategory(categoryTarget, categorySelected);
+				closeDialog('category-dialog');
+			}
+			else if (action === 'new-category') showCategoryForm();
+			else if (action === 'back-to-categories') showCategoryPicker();
 			else if (action === 'scan-receipt') {
 				document.getElementById('expense-scan-file')?.click();
 			}
@@ -1370,7 +1481,10 @@ async function onClick(event) {
 					state.flash = { type: 'ok', message: 'Categories re-run through the local analyst' };
 					await render();
 				}
-			} else if (action === 'export-report') await exportReport(trigger.dataset.format || 'csv');
+			} else if (action === 'export-report') {
+				closeDialog('export-dialog');
+				await exportReport(trigger.dataset.format || 'csv');
+			}
 			else if (action === 'enable-notifications') {
 				state.notifyPermission = await notifications.requestPermission();
 				if (state.notifyPermission === 'granted') await syncReminders({ request: true });
@@ -1426,8 +1540,8 @@ function filterExpenseDom() {
 		const matchType = !state.filters.type || row.dataset.type === state.filters.type;
 		const matchCategory =
 			!state.filters.category
-			|| state.filters.type === 'income'
-			|| (row.dataset.type === 'expense' && row.dataset.category === state.filters.category);
+			|| (row.dataset.type !== 'expense' && row.dataset.type !== 'income')
+			|| row.dataset.category === state.filters.category;
 		const matchMethod =
 			!state.filters.methodId || row.dataset.method === String(state.filters.methodId);
 		const matchQuery = !query || row.dataset.search.includes(query);

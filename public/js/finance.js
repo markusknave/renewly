@@ -3,7 +3,7 @@
 // deterministic so it can be tested without a browser.
 
 import { addDays, isValidIsoDate, todayInTz } from './lib/dates.js';
-import { EXPENSE_CATEGORIES, categoryInfo } from './lib/categories.js';
+import { categoriesFor, categoryInfo } from './lib/categories.js';
 
 export const TRANSACTION_TYPES = [
 	'expense',
@@ -531,7 +531,7 @@ export function averageDailySpend(transactions, today = localIsoToday(), days = 
 
 export function expenseCategoriesWithTotals(summary) {
 	const totals = new Map(summary.categories.map((entry) => [entry.key, entry]));
-	return EXPENSE_CATEGORIES.map((category) => ({
+	return categoriesFor('expense').map((category) => ({
 		...category,
 		amountCents: totals.get(category.key)?.amountCents || 0,
 		count: totals.get(category.key)?.count || 0,

@@ -56,6 +56,7 @@ const ICONS = {
 	edit: '<path d="M4 20h4l10-10-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
 	trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
 	download: '<path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/>',
+	upload: '<path d="M12 20V10"/><path d="m8 14 4-4 4 4"/><path d="M5 5h14"/>',
 	shield: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="m9 12 2 2 4-4"/>',
 	check: '<path d="m5 12 4.5 4.5L19 7"/>',
 	wallet: '<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/><path d="M16 14.5h2"/>',
@@ -76,9 +77,25 @@ const ICONS = {
 	plane: '<path d="M3 13l18-7-7 18-3-8z"/><path d="m11 16 3-3"/>',
 	dots: '<circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/>',
 	chevron: '<path d="m9 6 6 6-6 6"/>',
+	chevronLeft: '<path d="m15 6-6 6 6 6"/>',
 	refresh: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
 	camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.4"/>',
 	transfer: '<path d="M4 8h13"/><path d="m14 5 3 3-3 3"/><path d="M20 16H7"/><path d="m10 13-3 3 3 3"/>',
+	users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.8"/><path d="M17.5 14.8c2.1.6 3.5 2.3 3.5 5.2"/>',
+	social: '<circle cx="8" cy="9" r="2.8"/><circle cx="16.5" cy="9" r="2.4"/><path d="M2.5 19c0-2.8 2.5-4.8 5.5-4.8s5.5 2 5.5 4.8"/><path d="M14 14.6c2.8-.3 5.2 1.4 5.2 4.4"/>',
+	coffee: '<path d="M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 9h2.5a2.5 2.5 0 0 1 0 5H16"/><path d="M4 21h13"/>',
+	phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+	wifi: '<path d="M3 8.5a14 14 0 0 1 18 0"/><path d="M6.5 12a9 9 0 0 1 11 0"/><path d="M10 15.5a4 4 0 0 1 4 0"/><circle cx="12" cy="19" r="1"/>',
+	water: '<path d="M12 3s6 6.5 6 10.5A6 6 0 0 1 6 13.5C6 9.5 12 3 12 3z"/>',
+	bus: '<rect x="4" y="4" width="16" height="13" rx="3"/><path d="M4 10h16"/><path d="M8 20v-3M16 20v-3"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/>',
+	shirt: '<path d="M9 3 4 6l2 4 2-1v11h8V9l2 1 2-4-5-3-3 2z"/>',
+	paw: '<circle cx="7" cy="9" r="1.8"/><circle cx="12" cy="7" r="1.8"/><circle cx="17" cy="9" r="1.8"/><path d="M12 12c-3 0-5 2.2-5 4.3 0 1.7 1.4 2.7 3 2.2 1.3-.4 2.7-.4 4 0 1.6.5 3-.5 3-2.2 0-2.1-2-4.3-5-4.3z"/>',
+	baby: '<circle cx="12" cy="9" r="5.5"/><path d="M9.5 8h.01M14.5 8h.01"/><path d="M9.8 11.2c1.4 1.4 3 1.4 4.4 0"/><path d="M6 15c1 3 3.2 5.5 6 5.5s5-2.5 6-5.5"/>',
+	dumbbell: '<path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"/>',
+	music: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+	tools: '<path d="M15 4a4.5 4.5 0 0 0-3.7 6.9L3 19.2 4.8 21l8.3-8.3A4.5 4.5 0 0 0 20 9l-3 3-2-2z"/>',
+	key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l2 2M14 9l2 2"/>',
+	gift: '<path d="M4 10h16v10H4z"/><path d="M2.5 6h19v4h-19z"/><path d="M12 6v14"/><path d="M12 6c-2.6 0-4.2-1-4.2-2.4S9.4 1.4 12 6z"/><path d="M12 6c2.6 0 4.2-1 4.2-2.4S14.6 1.4 12 6z"/>',
 };
 
 export function icon(name, className = 'icon') {
@@ -120,16 +137,11 @@ export function methodProviderField(kind, label) {
 	</label>`;
 }
 
-export function breadcrumb(items) {
-	return `<nav class="breadcrumb" aria-label="Breadcrumb">${(items || [])
-		.map((item, index) => {
-			const label = esc(item.label);
-			const node = item.href
-				? `<a href="${esc(item.href)}">${label}</a>`
-				: `<span aria-current="page">${label}</span>`;
-			return `${index ? '<span class="breadcrumb-sep" aria-hidden="true">/</span>' : ''}${node}`;
-		})
-		.join('')}</nav>`;
+export function backLink(href, label = 'Back') {
+	return `<a class="back-link" href="${esc(href)}" aria-label="Back to ${esc(label)}">${icon(
+		'chevronLeft',
+		'back-icon'
+	)}<span>${esc(label)}</span></a>`;
 }
 
 export function avatar(name) {
