@@ -1,8 +1,9 @@
 // Insights screen: local-only analysis, forecast chart, and the offline chat.
 
 import { formatMoney } from '../lib/dates.js';
+import { categoryInfo } from '../lib/categories.js';
 import { SUGGESTED_PROMPTS } from '../insights.js';
-import { esc, icon, progressBar } from './shared.js';
+import { donut, esc, icon, progressBar } from './shared.js';
 
 function forecastChart(series) {
 	const points = series || [];
@@ -90,19 +91,30 @@ function goalFeasibility(goalRows) {
 		.join('')}</ul>`;
 }
 
-function categoryList(categories, totalCents) {
-	if (!categories.length) return '<p class="muted small">No expenses this month yet.</p>';
-	return `<ul class="category-list">${categories
-		.slice(0, 6)
-		.map(
-			(category) => `<li>
-				<span class="legend-dot" style="--cat:${category.color}"></span>
-				<span class="legend-name">${esc(category.label)}</span>
-				<span class="legend-value">${esc(formatMoney(category.amountCents, 'PHP'))}</span>
-				<span class="legend-share">${Math.round(category.share)}%</span>
-			</li>`
-		)
-		.join('')}</ul>`;
+function categoryOverview(categories, totalCents) {
+	if (!categories.length) {
+		return `<p class="muted small">No expenses this month yet. Log one from the Activity tab to see where your money goes.</p>`;
+	}
+	return `<div class="category-overview">
+		<div class="category-overview-chart">${donut(categories, totalCents, 'this month')}</div>
+		<ul class="category-ranking">${categories
+			.map((category) => {
+				const info = categoryInfo(category.key);
+				return `<li>
+					<span class="cat-badge" style="--cat:${esc(info.color)}">${icon(info.icon)}</span>
+					<div class="category-ranking-main">
+						<div class="category-ranking-head">
+							<strong>${esc(category.label)}</strong>
+							<span>${esc(formatMoney(category.amountCents, 'PHP'))} · ${Math.round(
+								category.share
+							)}%</span>
+						</div>
+						${progressBar(category.share, info.color)}
+					</div>
+				</li>`;
+			})
+			.join('')}</ul>
+	</div>`;
 }
 
 function chatLog(chat) {
@@ -168,6 +180,14 @@ export function insightsView({ insights, goalRows = [], chat = [], methods = [] 
 		</div>
 	</section>
 
+	<section class="panel category-panel">
+		<div class="panel-head">
+			<div><h2>Where your money goes</h2><p class="muted small">This month, ranked by category</p></div>
+			<span class="muted small">${esc(formatMoney(month.expenseCents, 'PHP'))} spent</span>
+		</div>
+		${categoryOverview(month.categories, month.expenseCents)}
+	</section>
+
 	<div class="insight-grid">
 		<section class="panel">
 			<div class="panel-head">
@@ -180,7 +200,6 @@ export function insightsView({ insights, goalRows = [], chat = [], methods = [] 
 				<span><i class="line-dashed"></i> Projected</span>
 				<span class="muted">Next 30 days: ${esc(formatMoney(insights.forecast.next30Cents, 'PHP'))}</span>
 			</div>
-			${categoryList(month.categories, month.expenseCents)}
 		</section>
 
 		<section class="panel">

@@ -11,7 +11,7 @@ import {
 	summarizeGroups,
 	UNGROUPED_LABEL,
 } from '../store.js';
-import { breadcrumb, esc, icon, options, relative, subscriptionRows } from './shared.js';
+import { backLink, esc, icon, options, relative, subscriptionRows } from './shared.js';
 
 function categoryLabel(category) {
 	return String(category || 'Other')
@@ -103,7 +103,7 @@ export function dashboardView({
 }) {
 	const active = subscriptions.filter((s) => s.status !== 'canceled');
 	const canceled = subscriptions.filter((s) => s.status === 'canceled');
-	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Subscriptions' }])}<div class="page-head">
+	return `${backLink('#/more', 'More')}<div class="page-head">
 		<div>
 			<p class="eyebrow">Subscriptions</p>
 			<h1>Recurring costs</h1>
@@ -220,11 +220,7 @@ export function formView({ sub, methods, groups = [], catalog, today, duplicate 
 				<span> Is this subscription for another individual or group? Fill in <em>Tracked for</em> below and save again; each person or group is tracked separately.</span>
 			</div>`
 		: '';
-	return `${breadcrumb([
-		{ label: 'More', href: '#/more' },
-		{ label: 'Subscriptions', href: '#/subscriptions' },
-		{ label: editing ? 'Edit subscription' : 'Add subscription' },
-	])}<div class="page-head">
+	return `${backLink('#/subscriptions', 'Subscriptions')}<div class="page-head">
 		<div>
 			<p class="eyebrow">Subscriptions</p>
 			<h1>${editing ? 'Edit subscription' : 'Add subscription'}</h1>
@@ -342,7 +338,7 @@ export function formView({ sub, methods, groups = [], catalog, today, duplicate 
 
 export function catalogView({ catalog, today }) {
 	if (!catalog) {
-		return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Catalog' }])}<div class="page-head"><div><p class="eyebrow">Subscriptions</p><h1>Catalog</h1><p class="muted">Plan prices are bundled with the app.</p></div></div>
+		return `${backLink('#/more', 'More')}<div class="page-head"><div><p class="eyebrow">Subscriptions</p><h1>Catalog</h1><p class="muted">Plan prices are bundled with the app.</p></div></div>
 		<section class="panel"><div class="empty"><h3>Catalog unavailable</h3><p class="muted">The bundled plan catalog could not be loaded. You can still add subscriptions manually.</p><p><a class="btn btn-primary" href="#/add">Add manually</a></p></div></section>`;
 	}
 	const categories = catalogCategories(catalog);
@@ -384,7 +380,7 @@ export function catalogView({ catalog, today }) {
 	const fx = catalog.fx
 		? `USD prices converted at ₱${Number(catalog.fx.rate).toFixed(2)} (${esc(catalog.fx.fetchedAt)}).`
 		: '';
-	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Catalog' }])}<div class="page-head">
+	return `${backLink('#/more', 'More')}<div class="page-head">
 		<div><p class="eyebrow">Subscriptions</p><h1>Plan catalog</h1><p class="muted">Public plan prices for mainstream platforms, normalized to PHP. ${esc(
 			fx
 		)}</p></div>
@@ -474,7 +470,7 @@ export function groupsView({ groups, subscriptions, methods, today }) {
 				)}</tbody></table></div>
 			</section>`
 		: '';
-	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Groups' }])}<div class="page-head">
+	return `${backLink('#/more', 'More')}<div class="page-head">
 		<div>
 			<p class="eyebrow">Subscriptions</p>
 			<h1>Groups</h1>
@@ -515,7 +511,7 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 		: 'Catalog unavailable';
 	const theme = THEMES.find((entry) => entry.id === (settings.theme || DEFAULT_APPEARANCE.theme));
 	const font = FONTS.find((entry) => entry.id === (settings.font || DEFAULT_APPEARANCE.font));
-	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Settings' }])}<div class="page-head"><div><p class="eyebrow">More</p><h1>Settings</h1><p class="muted">Everything is stored in this browser profile on this device.</p></div></div>
+	return `${backLink('#/more', 'More')}<div class="page-head"><div><p class="eyebrow">More</p><h1>Settings</h1><p class="muted">Everything is stored in this browser profile on this device.</p></div></div>
 	<section class="panel">
 		<div class="panel-head"><h2>Profile</h2></div>
 		<form class="stack" data-form="settings">
@@ -559,7 +555,7 @@ export function settingsView({ settings, catalog, stats, notifyPermission, subsc
 			<button class="btn" type="button" data-action="import">Import JSON</button>
 			<button class="btn btn-danger" type="button" data-action="clear-data">Erase all data</button>
 		</div>
-		<p class="hint">Export writes a plain JSON file with subscriptions, expenses, goals, cards, and settings. On Android it opens the share sheet. Import replaces everything currently on this device. CSV, Excel, and PDF reports live on the Expenses tab.</p>
+		<p class="hint">Export writes a plain JSON file with subscriptions, expenses, goals, cards, and settings. On Android it opens the share sheet. Import replaces everything currently on this device. CSV, Excel, and PDF reports live on the Activity tab.</p>
 	</section>
 	<section class="panel">
 		<div class="panel-head"><h2>About</h2></div>

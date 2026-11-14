@@ -26,6 +26,12 @@ import {
   summarize,
   saveExpense,
 } from '../public/js/store.js';
+import {
+  buildCustomCategory,
+  categoryInfo,
+  categoriesFor,
+  setCustomCategories,
+} from '../public/js/lib/categories.js';
 
 function subscriptionInput(overrides = {}) {
   return {
@@ -321,6 +327,16 @@ test('saveExpense stores expenses and income separately', async () => {
   assert.equal(income.type, 'income');
   assert.equal(income.category, 'income');
 
+  const salary = await saveExpense(db, {
+    type: 'income',
+    date: '2026-11-13',
+    merchant: 'Payroll',
+    amountCents: 50_000,
+    category: 'salary',
+    paymentMethodId: method.id,
+  });
+  assert.equal(salary.category, 'salary');
+
   const expense = await saveExpense(db, {
     type: 'expense',
     date: '2026-11-13',
@@ -338,6 +354,41 @@ test('saveExpense stores expenses and income separately', async () => {
   );
 });
 
+test('custom categories persist in settings and label saved rows', async () => {
+  const db = createMemoryBackend();
+  const method = await savePaymentMethod(db, { label: 'GCash', kind: 'ewallet' });
+  const coffee = buildCustomCategory({ label: 'Coffee runs', type: 'expense', icon: 'coffee' });
+  const bonus = buildCustomCategory({ label: 'Side gig', type: 'income', icon: 'wallet' });
+
+  const saved = await saveSettings(db, { customCategories: [coffee, bonus] });
+  setCustomCategories(saved.customCategories);
+  assert.equal(saved.customCategories.length, 2);
+  assert.equal(categoryInfo(coffee.key).label, 'Coffee runs');
+  assert.ok(categoriesFor('income').some((category) => category.key === bonus.key));
+
+  const row = await saveExpense(db, {
+    type: 'expense',
+    date: '2026-11-14',
+    merchant: 'Kape',
+    amountCents: 20_000,
+    category: coffee.key,
+    paymentMethodId: method.id,
+  });
+  assert.equal(row.category, coffee.key);
+
+  const income = await saveExpense(db, {
+    type: 'income',
+    date: '2026-11-14',
+    merchant: 'Editorial',
+    amountCents: 500_000,
+    category: bonus.key,
+    paymentMethodId: method.id,
+  });
+  assert.equal(income.category, bonus.key);
+
+  setCustomCategories([]);
+});
+
 test('settings return defaults and merge patches', async () => {
   const db = createMemoryBackend();
 
@@ -350,6 +401,7 @@ test('settings return defaults and merge patches', async () => {
     font: 'poppins',
     customAccent: '#6d4aff',
     customBackground: '#f7f3ec',
+    customCategories: [],
   });
   defaults.reminderDays.push(99);
   assert.deepEqual((await getSettings(db)).reminderDays, [7, 3, 1]);
@@ -363,6 +415,7 @@ test('settings return defaults and merge patches', async () => {
     font: 'poppins',
     customAccent: '#6d4aff',
     customBackground: '#f7f3ec',
+    customCategories: [],
   });
   assert.deepEqual(await getSettings(db), saved);
 

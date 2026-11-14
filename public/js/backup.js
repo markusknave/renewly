@@ -14,14 +14,19 @@ import {
 	MAX_TRANSACTION_NOTES,
 	saveSettings,
 } from './store.js';
-import { CATEGORY_KEYS, INCOME_CATEGORY } from './lib/categories.js';
+import {
+	CATEGORY_KEYS,
+	INCOME_CATEGORY,
+	INCOME_CATEGORY_KEYS,
+	normalizeCustomCategories,
+} from './lib/categories.js';
 import { INSTRUMENTS } from './lib/cardThemes.js';
 import { DEFAULT_APPEARANCE, FONT_IDS, THEME_IDS, normalizeHex } from './lib/themes.js';
 import { INTEREST_FREQUENCIES, TRANSACTION_TYPES } from './finance.js';
 
 export const EXPORT_APP = 'renewly';
-export const EXPORT_VERSION = 5;
-export const SUPPORTED_IMPORT_VERSIONS = [1, 2, 3, 4, 5];
+export const EXPORT_VERSION = 6;
+export const SUPPORTED_IMPORT_VERSIONS = [1, 2, 3, 4, 5, 6];
 
 const PAYMENT_KINDS = ['card', 'ewallet', 'bank', 'credit', 'cash', 'other'];
 const SUBSCRIPTION_KINDS = ['recurring', 'one_time'];
@@ -96,6 +101,7 @@ export function buildExport(
 			font: FONT_IDS.includes(settings?.font) ? settings.font : DEFAULT_APPEARANCE.font,
 			customAccent: normalizeHex(settings?.customAccent, DEFAULT_APPEARANCE.customAccent),
 			customBackground: normalizeHex(settings?.customBackground, DEFAULT_APPEARANCE.customBackground),
+			customCategories: normalizeCustomCategories(settings?.customCategories),
 		},
 		groups: (groups || []).map((group) => ({
 			id: group.id,
@@ -215,6 +221,7 @@ export function normalizeBackup(parsed) {
 			)
 		: [...DEFAULT_SETTINGS.reminderDays];
 	const timezone = text(settingsSource.timezone, 80);
+	const customCategories = normalizeCustomCategories(settingsSource.customCategories);
 	const settings = {
 		currency: 'PHP',
 		timezone: validTimezone(timezone) ? timezone : DEFAULT_SETTINGS.timezone,
@@ -223,6 +230,7 @@ export function normalizeBackup(parsed) {
 		font: FONT_IDS.includes(settingsSource.font) ? settingsSource.font : DEFAULT_APPEARANCE.font,
 		customAccent: normalizeHex(settingsSource.customAccent, DEFAULT_APPEARANCE.customAccent),
 		customBackground: normalizeHex(settingsSource.customBackground, DEFAULT_APPEARANCE.customBackground),
+		customCategories,
 	};
 
 	const groups = (Array.isArray(source.groups) ? source.groups : [])
@@ -265,6 +273,15 @@ export function normalizeBackup(parsed) {
 		}))
 		.filter((goal) => goal.targetCents > 0);
 
+	const expenseCategoryKeys = new Set([
+		...CATEGORY_KEYS,
+		...customCategories.filter((category) => category.type !== 'income').map((category) => category.key),
+	]);
+	const incomeCategoryKeys = new Set([
+		...INCOME_CATEGORY_KEYS,
+		...customCategories.filter((category) => category.type === 'income').map((category) => category.key),
+	]);
+
 	const transactions = (Array.isArray(source.transactions) ? source.transactions : [])
 		.filter(isPlainObject)
 		.map((transaction) => {
@@ -274,6 +291,7 @@ export function normalizeBackup(parsed) {
 			const auto = Boolean(transaction.auto) && type === 'interest';
 			const oldToPaymentMethodId =
 				type === 'transfer' ? transaction.toPaymentMethodId ?? null : null;
+			const rawCategory = text(transaction.category, 60);
 			return {
 				oldId: transaction.id ?? null,
 				type,
@@ -283,10 +301,10 @@ export function normalizeBackup(parsed) {
 				oldToPaymentMethodId,
 				oldGoalId: transaction.goalId ?? null,
 				category: type === 'income'
-					? INCOME_CATEGORY
+					? incomeCategoryKeys.has(rawCategory) ? rawCategory : INCOME_CATEGORY
 					: type === 'transfer'
 						? 'other'
-						: CATEGORY_KEYS.includes(transaction.category) ? transaction.category : 'other',
+						: expenseCategoryKeys.has(rawCategory) ? rawCategory : 'other',
 				merchant: text(transaction.merchant, MAX_EXPENSE_MERCHANT)
 					|| (type === 'interest' ? 'Interest earned' : type === 'transfer' ? 'Account transfer' : 'Entry'),
 				notes: text(transaction.notes, MAX_TRANSACTION_NOTES),

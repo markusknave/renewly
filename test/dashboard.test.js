@@ -134,6 +134,16 @@ test('expenses screen renders filters, exports, ledger rows, and the add dialog'
 	assert.match(html, /To Japan trip/);
 	assert.match(html, /id="expense-dialog"/);
 	assert.match(html, /data-dialog-error/);
+	assert.match(html, /data-action="new-expense"/);
+	assert.match(html, /data-action="new-income"/);
+	assert.match(html, /data-action="new-transfer"/);
+	assert.match(html, /data-action="open-import"/);
+	assert.match(html, /data-action="open-export"/);
+	assert.match(html, /id="transaction-import-dialog"/);
+	assert.match(html, /id="export-dialog"/);
+	assert.match(html, /id="category-dialog"/);
+	assert.match(html, /data-action="open-category"/);
+	assert.doesNotMatch(html, /class="import-table"/);
 });
 
 test('expenses screen differentiates income and expenses', () => {
@@ -164,6 +174,9 @@ test('expenses screen differentiates income and expenses', () => {
 	assert.match(html, /Salary/);
 	assert.match(html, /name="type" data-expense-type/);
 	assert.match(html, /data-expense-submit/);
+	assert.match(html, /<optgroup label="Income">/);
+	assert.match(html, /<option value="salary"/);
+	assert.match(html, /<option value="refunds"/);
 });
 
 test('goals screen renders progress, feasibility copy, and both dialogs', () => {
@@ -183,6 +196,9 @@ test('insights screen shows the privacy banner, forecast, tips, and chat', () =>
 	assert.match(html, /Private by construction/);
 	assert.match(html, /cannot browse, call APIs/);
 	assert.match(html, /class="forecast-chart"/);
+	assert.match(html, /Where your money goes/);
+	assert.match(html, /class="category-ranking"/);
+	assert.match(html, /Food &amp; drinks/);
 	assert.match(html, /What stands out/);
 	assert.match(html, /data-form="chat"/);
 	assert.match(html, /data-chat-prompt=/);
@@ -196,14 +212,14 @@ test('more hub links every secondary screen', () => {
 	}
 });
 
-test('More modules expose a breadcrumb back to the hub', () => {
+test('secondary screens use a back link instead of breadcrumbs', () => {
 	const pages = [
 		cardsView({ methods, snapshots, today }),
 		moreView({ methods, goals, subscriptions, transactions, settings }),
 	];
 	const html = pages.join('');
-	assert.ok(html.includes('aria-label="Breadcrumb"'));
-	assert.ok(html.includes('href="#/more"'));
+	assert.match(html, /class="back-link" href="#\/more"/);
+	assert.doesNotMatch(html, /Breadcrumb/);
 	assert.ok(html.includes('Cards &amp; wallets'));
 });
 

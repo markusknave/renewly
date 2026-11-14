@@ -111,7 +111,7 @@ export function buildInsights({ transactions, methods, goals, subscriptions, tod
 		tips.push({
 			tone: 'info',
 			title: 'Start with one expense today',
-			body: 'Log a purchase or bill on the Expenses tab. After a few days this page can compare weeks, forecast month-end spending, and check your goals.',
+			body: 'Log a purchase or bill on the Activity tab. After a few days this page can compare weeks, forecast month-end spending, and check your goals.',
 		});
 	}
 	if (changePct !== null && changePct > 15) {
@@ -122,7 +122,7 @@ export function buildInsights({ transactions, methods, goals, subscriptions, tod
 				? `${topCategory.label} is the biggest driver at ${money(topCategory.amountCents)}. Trimming that category by 20% would save about ${money(
 						Math.round(topCategory.amountCents * 0.2)
 					)} this month.`
-				: 'Review the largest entries in the Expenses tab before the month ends.',
+				: 'Review the largest entries in the Activity tab before the month ends.',
 		});
 	}
 	if (topCategory && spendShare(topCategory) > 35) {

@@ -64,7 +64,7 @@ public class AndroidShellTest {
         String styles = readAsset(context, "public/styles.css");
         String fonts = readAsset(context, "public/fonts/fonts.css");
 
-        assertTrue(index.contains("beta-2.1"));
+        assertTrue(index.contains("beta-2.2"));
         assertTrue(index.contains("./fonts/fonts.css"));
         assertTrue(styles.contains("--font-ui"));
         assertTrue(fonts.contains("'Poppins'"));

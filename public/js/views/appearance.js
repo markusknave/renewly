@@ -2,7 +2,7 @@
 // fonts. Changes apply immediately and are saved with the settings form.
 
 import { DEFAULT_APPEARANCE, FONTS, THEMES } from '../lib/themes.js';
-import { breadcrumb, esc, icon } from './shared.js';
+import { backLink, esc, icon } from './shared.js';
 
 function themeCard(theme, selected) {
 	return `<label class="theme-card${selected === theme.id ? ' is-active' : ''}" data-theme-card="${theme.id}">
@@ -35,7 +35,7 @@ export function appearanceView({ settings = {} }) {
 	const selectedFont = settings.font || DEFAULT_APPEARANCE.font;
 	const accent = settings.customAccent || DEFAULT_APPEARANCE.customAccent;
 	const background = settings.customBackground || DEFAULT_APPEARANCE.customBackground;
-	return `${breadcrumb([{ label: 'More', href: '#/more' }, { label: 'Appearance' }])}
+	return `${backLink('#/more', 'More')}
 	<div class="page-head">
 		<div>
 			<p class="eyebrow">Make it yours</p>

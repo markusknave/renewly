@@ -6,12 +6,37 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-2.1](https://github.com/markusknave/renewly/releases/tag/beta-2.1),
+[beta-2.2](https://github.com/markusknave/renewly/releases/tag/beta-2.2),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-2.1.apk
+renewly-beta-2.2.apk
 ```
+
+## What is new in beta-2.2
+
+- **Activity is the one place to log and review money.** It opens with three
+  large entry buttons — Expense, Income, and Transfer funds — and keeps Import
+  and Export in the top right. Both open focused modals instead of leaving the
+  tab.
+- **The + tab.** The mobile bar is now Home, Cards, Activity, Plan, and More,
+  with Activity in the middle behind a `+` icon.
+- **Centered dialogs.** Every dialog is centered on the phone and scrolls
+  inside the viewport, including the expense form on short screens.
+- **Readable import review.** Parsed rows stack as compact cards with date,
+  description, type, category, account, and status. The review fits the modal
+  width and never scrolls sideways.
+- **Income categories.** Income now has Salary, Payments, Grants, Refunds,
+  Investment, and Other income. Expenses gain Family and Social.
+- **Custom categories.** Add your own expense or income category with a name and
+  an icon from the bundled glossary. Each category gets a color, appears in the
+  picker, labels saved rows, and rides in JSON backups. The backup format moves
+  to version 6; older backups still import.
+- **Category summary in Insights.** A new *Where your money goes* panel shows the
+  month's expense split as a donut plus ranked rows with icons, amounts, shares,
+  and progress bars.
+- **Back buttons, not breadcrumbs.** Secondary screens under More use a `<` back
+  button, so the header stays short on phones.
 
 ## What is new in beta-2.1
 
@@ -19,17 +44,13 @@ renewly-beta-2.1.apk
   prepaid cards, bank accounts, e-wallets, credit/BNPL lines, and cash can all
   be a source or destination. A debit-to-e-wallet transfer lowers the debit and
   raises the wallet by the same amount; the total across accounts never changes.
-- **Transfers in imports.** The preview now shows **From** and **To** account
+- **Transfers in imports.** The preview shows **From** and **To** account
   pickers for transfer rows. A row that names only one side can use the default
   source, and a transfer that still lacks two distinct accounts is rejected
   instead of becoming a fake expense.
 - **Focused dropdowns.** Every select opens a list anchored to the field, moves
   keyboard focus into the list, highlights the current value, and scrolls it into
   view. Account, provider, plan, and time-zone lists keep their search field.
-- **Grouped navigation.** The mobile bar is Home, Activity, Cards, Plan, and
-  More. More is split into Daily money, Recurring, Tools, and App, so Goals,
-  Insights, import, groups, the plan catalog, appearance, and settings are one
-  step away.
 - **Five themes and ten fonts.** Ivory, Linen, Bloom, Tide, and Midnight ship
   with complete palettes. Custom lets you choose the accent and background;
   contrast is derived automatically. Poppins, Inter, Roboto, Open Sans,
@@ -116,8 +137,8 @@ renewly-beta-2.1.apk
 - **Statement import.** Read CSV, text PDF, Excel (.xlsx), JSON, and Realbyte
   Money Manager `.mbak`/`.mmbak` backups. Preview every row, see the local
   analyst's category summary, skip duplicates, and commit the expenses.
-- **Breadcrumbs.** Every module under **More** now shows `More / Module` and a
-  link back to the hub.
+- **Back links.** Every module under **More** now shows a `<` back button
+  instead of breadcrumbs, so the header stays short on phones.
 - **Android home-screen widget.** A 2×1 Renewly widget opens the expense tracker
   and the add-expense dialog directly from the launcher.
 - **Current bank name.** SeaBank Philippines is now MariBank, so the provider
@@ -164,9 +185,12 @@ renewly-beta-2.1.apk
 - Scan a receipt, payslip, or bank transfer confirmation to prefill the dialog.
   The parser prefers a printed grand total, amount due, net pay, or net income
   and stays editable before saving.
-- Categories: food and drinks, groceries, transport, bills and utilities,
-  shopping, health, entertainment, education, travel, home, and other. Income
-  uses the dedicated Income category.
+- Categories: for expenses, food and drinks, groceries, transportation, bills
+  and utilities, shopping, health, family, social, entertainment, education,
+  travel, home, and other. For income, salary, payments, grants, refunds,
+  investment, and other income. Pick a category from the icon grid, or add your
+  own with a name and an icon from the bundled glossary. Custom categories are
+  saved with your settings and travel in JSON backups.
 - Every payment method has a starting balance and a balance date. Its current
   balance is the starting balance plus income and interest, minus expenses and
   goal deposits, plus goal withdrawals.
@@ -179,8 +203,9 @@ renewly-beta-2.1.apk
 
 - Supported files: CSV/TSV, text-based PDF, Excel `.xlsx`, JSON, and Realbyte
   Money Manager `.mbak`/`.mmbak` (ZIP-wrapped or plain SQLite).
-- Open **Expenses → Import** or **More → Import transactions**. Choose or drop a
-  file, review the parsed rows, then import.
+- Open **Activity → Import** or **More → Import transactions**. Choose or drop a
+  file, review the parsed rows in the modal, then import. The preview stacks
+  each row as a card, so it fits the phone screen without horizontal scrolling.
 - The local analyst infers categories from the description and notes, and
   matches account/card names to your saved payment methods. When the statement
   names a card or wallet you have not saved, the preview lists it under
@@ -314,30 +339,38 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-2.1.apk
+adb install -r renewly-beta-2.2.apk
 ```
+
+### Updating from beta-2.1
+
+Install beta-2.2 over beta-2.1. The signing key, IndexedDB schema version 3, and
+all saved accounts stay in place, so no uninstall or backup restore is required.
+Custom categories are added to the settings record; existing expenses and income
+keep their categories.
 
 ### Updating from beta-1.5
 
-Install beta-2.1 over beta-1.5. It uses the same signing key and IndexedDB
-schema version 3, so no uninstall or backup restore is required. Themes and
-transfer fixes use the existing settings and transaction stores.
+Install beta-2.2 over beta-1.5. It uses the same signing key and IndexedDB
+schema version 3, so no uninstall or backup restore is required. Themes,
+transfers, and custom categories use the existing settings and transaction
+stores.
 
 ### Updating from beta-1.4
 
-Install beta-2.1 over beta-1.4. It uses the same signing key and the same
+Install beta-2.2 over beta-1.4. It uses the same signing key and the same
 IndexedDB schema version 3, so no uninstall or backup restore is required. JSON
-backup format 5 still imports and accepts Credit / BNPL accounts.
+backup format 6 imports, and older format 5 backups still import.
 
 ### Updating from beta-1.3
 
-Install beta-2.1 over beta-1.3. It uses the same signing key and the same
-IndexedDB schema version 3, so no uninstall or backup restore is required. The
-JSON backup format stays at version 5; beta-2.1 imports versions 1 through 5.
+Install beta-2.2 over beta-1.3. It uses the same signing key and the same
+IndexedDB schema version 3, so no uninstall or backup restore is required. beta-2.2
+imports JSON backups in versions 1 through 6.
 
 ### Updating from beta-1.2-hotfix
 
-Install beta-2.1 over beta-1.2-hotfix. It uses the same rotated signing key and
+Install beta-2.2 over beta-1.2-hotfix. It uses the same rotated signing key and
 the same IndexedDB schema, so no uninstall or backup restore is required.
 
 ### Updating from beta-1.2 or earlier
@@ -348,7 +381,7 @@ different signer, so it will reject an in-place update with
 
 1. Export a JSON backup from **More → Settings**.
 2. Uninstall Renewly once.
-3. Install `renewly-beta-2.1.apk`.
+3. Install `renewly-beta-2.2.apk`.
 4. Restore the JSON backup.
 
 The new certificate SHA-256 fingerprint is:
@@ -360,12 +393,12 @@ The new certificate SHA-256 fingerprint is:
 Verify it with:
 
 ```bash
-apksigner verify --print-certs renewly-beta-2.1.apk
+apksigner verify --print-certs renewly-beta-2.2.apk
 ```
 
 ### Updating from beta-1.1
 
-Installing beta-2.1 over beta-1.1 keeps the IndexedDB database, but the
+Installing beta-2.2 over beta-1.1 keeps the IndexedDB database, but the
 signing key changed. Follow the one-time reinstall steps above. There is no
 schema change; the import feature only adds rows through the existing expense
 store.
@@ -420,7 +453,7 @@ See [docs/ANDROID.md](docs/ANDROID.md) for SDK setup and troubleshooting.
   Web Worker, and neither the image nor the extracted text leaves the device.
   The engine caches its English model in a separate IndexedDB store; that cache
   holds no personal data.
-- Export produces a plain JSON file (format version 5). On Android the file is
+- Export produces a plain JSON file (format version 6). On Android the file is
   written to the app cache and handed to the system share sheet so it can be
   saved to Files, Drive, or another app; in a browser it uses the save picker or
   a normal download.

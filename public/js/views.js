@@ -3,6 +3,7 @@
 
 export {
 	avatar,
+	backLink,
 	bankCard,
 	categoryBadge,
 	costLabel,
@@ -39,7 +40,14 @@ export {
 
 export { cardsView } from './views/money.js';
 export { homeView } from './views/home.js';
-export { expenseDialog, expensesView } from './views/expenses.js';
+export {
+	categoryDialog,
+	categoryForm,
+	categoryPicker,
+	expenseDialog,
+	expensesView,
+	exportDialog,
+} from './views/expenses.js';
 export { goalDialog, goalsView, transferDialog } from './views/goals.js';
 export { insightsView } from './views/insights.js';
 export { importView } from './views/import.js';
