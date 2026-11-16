@@ -387,6 +387,8 @@ export function expensesView({
 		accounts: importAccounts || [],
 		fileName: importPreview?.fileName || '',
 		methodsCount: importMethodsCount,
+		methods,
+		defaultMethodId: importDefaultMethodId,
 	})}
 	${importView({
 		methods,

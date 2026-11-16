@@ -227,6 +227,16 @@ body[data-route='more'] .fab { display: none !important; }
 	box-shadow: var(--shadow-sm);
 }
 .panel-muted { background: var(--surface-2); }
+/* Adjacent top-level containers keep their borders apart. Grids inside a
+   screen already provide their own gap, so only direct app children apply. */
+#app > .panel + .panel,
+#app > .panel + .section-block,
+#app > .section-block + .panel,
+#app > .panel + .insight-grid,
+#app > .insight-grid + .panel,
+#app > .more-summary + .more-group {
+	margin-top: 14px;
+}
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .panel-head h2 { letter-spacing: -0.02em; }
 .hint { display: block; margin-top: 6px; color: var(--muted); font-size: 0.74rem; line-height: 1.45; }
