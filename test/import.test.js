@@ -176,21 +176,24 @@ test('MMBAK reads ZIP or plain SQLite Money Manager rows', async () => {
 		CREATE TABLE ZCATEGORY (uid INTEGER PRIMARY KEY, ZNAME TEXT);
 		CREATE TABLE ZASSETS (uid INTEGER PRIMARY KEY, NIC_NAME TEXT);
 		INSERT INTO ZCATEGORY (uid, ZNAME) VALUES (10, 'Food & Drinks'), (11, 'Shopping');
-		INSERT INTO ZASSETS (uid, NIC_NAME) VALUES (20, 'BPI Debit'), (21, 'Maya');
+		INSERT INTO ZASSETS (uid, NIC_NAME) VALUES (20, 'BPI Debit'), (21, 'Maya'), (22, 'BPI Debit->Maya');
 		INSERT INTO ZINOUTCOME (ZMONEY, WDATE, DO_TYPE, ZCATEGORY, ZASSET, ZCONTENT, IS_DEL) VALUES
 			(125.50, 1761955200, 1, 10, 20, 'Jollibee lunch', 0),
 			(899.00, 1762041600, 1, 11, 21, 'Uniqlo shirt', 0),
 			(50000.00, 1762128000, 0, 11, 21, 'Salary', 0),
+			(250.00, 1762300800, 2, 11, 22, 'Fund move', 0),
 			(999.00, 1762214400, 1, 10, 20, 'Deleted', 1);
 	`);
 	db.close();
 	try {
 		const bytes = readFileSync(path);
 		const result = await readMmbak(bytes, { methods, defaultMethodId: 1 });
-		assert.equal(result.rows.length, 3);
+		assert.equal(result.rows.length, 4);
 		assert.equal(result.stats.expenseCount, 2);
 		assert.equal(result.stats.incomeCount, 1);
 		assert.equal(result.stats.incomeCents, 5_000_000);
+		assert.equal(result.stats.transferCount, 1);
+		assert.equal(result.stats.transferCents, 25_000);
 		assert.equal(result.rows[0].category, 'food');
 		assert.equal(result.rows[0].paymentMethodId, 1);
 		assert.equal(result.rows[0].type, 'expense');
@@ -198,6 +201,9 @@ test('MMBAK reads ZIP or plain SQLite Money Manager rows', async () => {
 		assert.equal(result.rows[1].merchant, 'Uniqlo shirt');
 		assert.equal(result.rows[2].type, 'income');
 		assert.equal(result.rows[2].merchant, 'Salary');
+		assert.equal(result.rows[3].type, 'transfer');
+		assert.equal(result.rows[3].paymentMethodId, 1);
+		assert.equal(result.rows[3].transferMethodId, 2);
 		assert.equal(result.rows[2].category, 'income');
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
@@ -368,6 +374,86 @@ test('missing transfer destinations join the account check', async () => {
 	const linked = linkRowsToMethods(preview.rows, methods, [], links);
 	assert.equal(linked[0].transferMethodId, created[0].id);
 	assert.equal(linked[0].missingTransferMethod, null);
+});
+
+test('account pairs become transfers, never one combined account', async () => {
+	const accounts = [
+		{ id: 1, label: 'GCash' },
+		{ id: 2, label: 'MariBank' },
+	];
+	const preview = await parseImportFile(
+		fileLike(
+			'pair.csv',
+			'Date,Description,Amount,Account\n2026-11-02,Fund move,500.00,GCash->MariBank',
+			'text/csv'
+		),
+		{ methods: accounts, today: '2026-11-13' }
+	);
+	const row = preview.rows[0];
+	assert.equal(row.type, 'transfer');
+	assert.equal(row.paymentMethodId, 1);
+	assert.equal(row.transferMethodId, 2);
+	assert.equal(row.missingMethod, null);
+	assert.equal(row.missingTransferMethod, null);
+	assert.deepEqual(preview.missingMethods, []);
+	assert.equal(preview.stats.transferCount, 1);
+	assert.equal(preview.stats.expenseCount, 0);
+
+	const spaced = await parseImportFile(
+		fileLike(
+			'pair.csv',
+			'Date,Description,Amount,Account\n2026-11-02,Fund move,500.00,GCash to MariBank',
+			'text/csv'
+		),
+		{ methods: accounts, today: '2026-11-13' }
+	);
+	assert.equal(spaced.rows[0].type, 'transfer');
+	assert.equal(spaced.rows[0].paymentMethodId, 1);
+	assert.equal(spaced.rows[0].transferMethodId, 2);
+
+	const descriptionPair = await parseImportFile(
+		fileLike(
+			'pair.csv',
+			'Date,Description,Amount\n2026-11-02,GCash->MariBank,500.00',
+			'text/csv'
+		),
+		{ methods: accounts, today: '2026-11-13' }
+	);
+	assert.equal(descriptionPair.rows[0].type, 'transfer');
+	assert.equal(descriptionPair.rows[0].paymentMethodId, 1);
+	assert.equal(descriptionPair.rows[0].transferMethodId, 2);
+});
+
+test('an account pair lists each missing side separately', async () => {
+	const gcash = { id: 1, label: 'GCash' };
+	const preview = await parseImportFile(
+		fileLike(
+			'pair.csv',
+			'Date,Description,Amount,Account\n2026-11-02,Fund move,500.00,GCash->MariBank',
+			'text/csv'
+		),
+		{ methods: [gcash], today: '2026-11-13' }
+	);
+	const row = preview.rows[0];
+	assert.equal(row.type, 'transfer');
+	assert.equal(row.paymentMethodId, 1);
+	assert.equal(row.transferMethodId, null);
+	assert.equal(row.missingTransferMethod, 'MariBank');
+	assert.deepEqual(preview.missingMethods.map((account) => account.label), ['MariBank']);
+	assert.ok(!preview.missingMethods.some((account) => account.label.includes('->')));
+});
+
+test('PDF lines with an account pair map to a transfer', () => {
+	const accounts = [
+		{ id: 1, label: 'GCash' },
+		{ id: 2, label: 'MariBank' },
+	];
+	const result = linesToTransactions(['2026-11-02 GCash->MariBank 500.00'], { methods: accounts });
+	assert.equal(result.rows.length, 1);
+	assert.equal(result.rows[0].type, 'transfer');
+	assert.equal(result.rows[0].paymentMethodId, 1);
+	assert.equal(result.rows[0].transferMethodId, 2);
+	assert.equal(result.stats.transferCount, 1);
 });
 
 test('renaming a detected account to an existing label links instead of creating', async () => {

@@ -4,7 +4,7 @@
 
 import { readZip } from './xlsx.js';
 import { detectCategory, INCOME_CATEGORY } from '../lib/categories.js';
-import { matchMethod, missingMethodLabel, parseAnyDate, parseMoney, mapCategory, duplicateKey } from './table.js';
+import { accountPairFor, matchMethod, missingMethodLabel, parseAnyDate, parseMoney, mapCategory, duplicateKey } from './table.js';
 
 const textDecoder = new TextDecoder('utf-8');
 const utf16le = new TextDecoder('utf-16le');
@@ -363,11 +363,12 @@ export async function readMmbak(bytes, options = {}) {
 
 	const existingKeys = new Set(
 		(existing || [])
-			.filter((row) => row && (row.type === 'expense' || row.type === 'income'))
+			.filter((row) => row && ['expense', 'income', 'transfer'].includes(row.type))
 			.map((row) =>
 				duplicateKey(
 					{ date: row.date, type: row.type, amountCents: row.amountCents, merchant: row.merchant },
-					row.paymentMethodId ?? null
+					row.paymentMethodId ?? null,
+					row.toPaymentMethodId ?? null
 				)
 			)
 	);
@@ -379,11 +380,14 @@ export async function readMmbak(bytes, options = {}) {
 	let incomeCount = 0;
 	let expenseCents = 0;
 	let incomeCents = 0;
+	let transferCount = 0;
+	let transferCents = 0;
+	let transfersMissingAccount = 0;
 
 	for (const row of txnTable.rows) {
 		if (deletedCol && isDeleted(row[deletedCol])) continue;
 		const kind = kindOf(valueOf(row, typeCol));
-		if (kind !== 'expense' && kind !== 'income') continue;
+		if (!['expense', 'income', 'transfer'].includes(kind)) continue;
 		const date = parseAnyDate(valueOf(row, dateCol));
 		const amountValue = valueOf(row, amountCol);
 		const amountCents = typeof amountValue === 'number'
@@ -400,36 +404,66 @@ export async function readMmbak(bytes, options = {}) {
 		).trim();
 		const assetText = String(assets.get(String(valueOf(row, assetFk) ?? '')) || '').trim();
 		const memo = String(valueOf(row, memoCol) ?? '').trim();
-		const merchant = (memo || categoryText || assetText || (kind === 'income' ? 'Imported income' : 'Imported expense')).slice(0, 60);
-		const category = kind === 'income'
+		const pair = accountPairFor(assetText, methods);
+		if (kind === 'transfer' && !pair) continue;
+		const type = pair ? 'transfer' : kind;
+		const merchant = (memo || categoryText || assetText || (type === 'income' ? 'Imported income' : 'Imported expense')).slice(0, 60);
+		const category = type === 'income'
 			? INCOME_CATEGORY
-			: mapCategory(categoryText) || detectCategory(`${merchant} ${memo}`) || 'other';
-		const matchedMethodId = matchMethod(assetText, methods);
-		const missingMethod = missingMethodLabel(assetText, matchedMethodId);
-		const paymentMethodId = matchedMethodId ?? (assetText ? null : defaultMethodId ?? null);
+			: type === 'transfer'
+				? 'other'
+				: mapCategory(categoryText) || detectCategory(`${merchant} ${memo}`) || 'other';
+		let paymentMethodId;
+		let transferMethodId;
+		let missingMethod;
+		let missingTransferMethod;
+		let transferAccountText;
+		if (pair) {
+			paymentMethodId = pair.fromId;
+			transferMethodId = pair.toId;
+			missingMethod = pair.missingFrom;
+			missingTransferMethod = pair.missingTo;
+			transferAccountText = pair.to;
+		} else {
+			const matchedMethodId = matchMethod(assetText, methods);
+			missingMethod = missingMethodLabel(assetText, matchedMethodId);
+			paymentMethodId = matchedMethodId ?? (assetText ? null : defaultMethodId ?? null);
+			transferMethodId = null;
+			missingTransferMethod = null;
+			transferAccountText = null;
+		}
 		const transaction = {
-			type: kind,
+			type,
 			date,
 			merchant,
 			amountCents,
 			category,
 			notes: memo.slice(0, 500),
 			paymentMethodId,
+			transferMethodId,
+			direction: type === 'transfer' ? 'out' : null,
 			methodLabel:
 				methods.find((method) => method.id === paymentMethodId)?.label ||
 				missingMethod ||
+				(pair ? pair.from : '') ||
 				(assetText ? '' : methods.find((method) => method.id === defaultMethodId)?.label || ''),
 			missingMethod,
+			missingTransferMethod,
+			transferAccountText,
 			source: 'Money Manager import',
 		};
-		if (kind === 'income') {
+		if (type === 'transfer') {
+			transferCount += 1;
+			transferCents += amountCents;
+			if (transferMethodId === null || paymentMethodId === null) transfersMissingAccount += 1;
+		} else if (type === 'income') {
 			incomeCount += 1;
 			incomeCents += amountCents;
 		} else {
 			expenseCount += 1;
 			expenseCents += amountCents;
 		}
-		const key = duplicateKey(transaction, paymentMethodId);
+		const key = duplicateKey(transaction, paymentMethodId, transferMethodId);
 		if (existingKeys.has(key) || seen.has(key)) {
 			transaction.duplicate = true;
 			duplicates += 1;
@@ -449,6 +483,9 @@ export async function readMmbak(bytes, options = {}) {
 			incomeCount,
 			expenseCents,
 			incomeCents,
+			transferCount,
+			transferCents,
+			transfersMissingAccount,
 		},
 		warnings: categoryTable && assetTable ? [] : ['Some category or account names could not be resolved from the backup.'],
 	};
