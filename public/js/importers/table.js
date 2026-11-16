@@ -264,6 +264,71 @@ export function missingMethodLabel(value, matchedId = null) {
 	return text;
 }
 
+const ACCOUNT_PAIR_ARROW = /\s*(?:->|=>|→|➜|⟶|⇒|—>)\s*/;
+const ACCOUNT_PAIR_WORDS = /^\s*(.*?)\s+(?:to|into)\s+(.+?)\s*$/i;
+const PAIR_NOISE = /^(transfer|fund transfer|instapay|pesonet|sent|received|payment|to|from)$/i;
+
+function cleanAccountName(value) {
+	return String(value ?? '')
+		.replace(/^(?:from|transfer(?:red)?\s+from)\s+/i, '')
+		.replace(/^(?:to|into)\s+/i, '')
+		.replace(/[.,;:]+$/g, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, 60);
+}
+
+// "GCash->MariBank" is one transfer between two accounts, never one account
+// named after both. Arrows are accepted anywhere; spaced "to"/"into" is accepted
+// only for account columns so ordinary descriptions are not split.
+export function parseAccountPair(value, { words = true } = {}) {
+	const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+	if (!text) return null;
+	const arrowParts = text.split(ACCOUNT_PAIR_ARROW);
+	if (arrowParts.length === 2) {
+		const from = cleanAccountName(arrowParts[0]);
+		const to = cleanAccountName(arrowParts[1]);
+		if (
+			from
+			&& to
+			&& !PAIR_NOISE.test(from)
+			&& !PAIR_NOISE.test(to)
+			&& normalizeHeader(from) !== normalizeHeader(to)
+		) {
+			return { from, to, raw: text };
+		}
+	}
+	if (!words || ACCOUNT_PAIR_ARROW.test(text)) return null;
+	const match = ACCOUNT_PAIR_WORDS.exec(text);
+	if (!match) return null;
+	const from = cleanAccountName(match[1]);
+	const to = cleanAccountName(match[2]);
+	if (
+		!from
+		|| !to
+		|| PAIR_NOISE.test(from)
+		|| PAIR_NOISE.test(to)
+		|| normalizeHeader(from) === normalizeHeader(to)
+	) {
+		return null;
+	}
+	return { from, to, raw: text };
+}
+
+export function accountPairFor(value, methods = [], options = {}) {
+	const pair = parseAccountPair(value, options);
+	if (!pair) return null;
+	const fromId = matchMethod(pair.from, methods);
+	const toId = matchMethod(pair.to, methods);
+	return {
+		...pair,
+		fromId,
+		toId,
+		missingFrom: missingMethodLabel(pair.from, fromId),
+		missingTo: missingMethodLabel(pair.to, toId),
+	};
+}
+
 // Finds the other account named in a transfer description. It ignores generic
 // words such as "bank" or "debit" so "BPI Debit" is not matched by every bank
 // row, and it can skip the statement's own account.
@@ -473,32 +538,60 @@ export function rowsToTransactions(rows, options = {}) {
 			continue;
 		}
 
-		const description = descriptionCell || row
+		let description = descriptionCell || row
 			.filter((value, index) => index !== mapping.date && index !== mapping.amount && index !== mapping.debit && index !== mapping.credit)
 			.map((value) => String(value ?? '').trim())
 			.filter(Boolean)
 			.join(' ')
-			.slice(0, 60) || (type === 'income' ? 'Imported income' : type === 'transfer' ? 'Account transfer' : 'Imported expense');
+			.slice(0, 60);
 		const notes = String(cell(row, mapping.notes) || '').trim().slice(0, 500);
+		const methodText = String(cell(row, mapping.method) ?? '').trim();
+		const pair = accountPairFor(methodText, methods)
+			|| accountPairFor(description, methods, { words: false });
+		if (pair) {
+			type = 'transfer';
+			direction = 'out';
+		}
+		if (!description) {
+			description = type === 'income'
+				? 'Imported income'
+				: type === 'transfer'
+					? 'Account transfer'
+					: 'Imported expense';
+		}
 		const category = type === 'income'
 			? INCOME_CATEGORY
 			: type === 'transfer'
 				? 'other'
 				: mapCategory(categoryText) || detectCategory(`${description} ${notes}`) || 'other';
-		const methodText = String(cell(row, mapping.method) ?? '').trim();
-		const matchedMethodId = matchMethod(methodText, methods);
-		const missingMethod = missingMethodLabel(methodText, matchedMethodId);
-		const paymentMethodId = matchedMethodId ?? (methodText ? null : defaultMethodId ?? null);
-		const transferAccountText = type === 'transfer'
-			? `${description} ${notes}`.trim()
-			: null;
-		const transferMethodId = type === 'transfer'
-			? matchTransferMethod(transferAccountText, methods, paymentMethodId)
-			: null;
-		const missingTransferMethod = type === 'transfer' && transferMethodId === null
-			? possibleTransferAccount(transferAccountText, methods, paymentMethodId)
-			: null;
-		if (type === 'transfer' && transferMethodId === null) transfersMissingAccount += 1;
+		let missingMethod;
+		let paymentMethodId;
+		let transferMethodId;
+		let missingTransferMethod;
+		let transferAccountText;
+		if (pair) {
+			missingMethod = pair.missingFrom;
+			paymentMethodId = pair.fromId;
+			transferMethodId = pair.toId;
+			missingTransferMethod = pair.missingTo;
+			transferAccountText = pair.to;
+		} else {
+			const matchedMethodId = matchMethod(methodText, methods);
+			missingMethod = missingMethodLabel(methodText, matchedMethodId);
+			paymentMethodId = matchedMethodId ?? (methodText ? null : defaultMethodId ?? null);
+			transferAccountText = type === 'transfer'
+				? `${description} ${notes}`.trim()
+				: null;
+			transferMethodId = type === 'transfer'
+				? matchTransferMethod(transferAccountText, methods, paymentMethodId)
+				: null;
+			missingTransferMethod = type === 'transfer' && transferMethodId === null
+				? possibleTransferAccount(transferAccountText, methods, paymentMethodId)
+				: null;
+		}
+		if (type === 'transfer' && (transferMethodId === null || paymentMethodId === null)) {
+			transfersMissingAccount += 1;
+		}
 		const transaction = {
 			type,
 			date,
@@ -512,6 +605,7 @@ export function rowsToTransactions(rows, options = {}) {
 			methodLabel:
 				methods.find((method) => method.id === paymentMethodId)?.label ||
 				missingMethod ||
+				(pair ? pair.from : '') ||
 				(methodText ? '' : methods.find((method) => method.id === defaultMethodId)?.label || ''),
 			missingMethod,
 			missingTransferMethod,
@@ -617,8 +711,8 @@ export function linesToTransactions(lines, options = {}) {
 			continue;
 		}
 		const classified = classifyType('', '', line);
-		const type = classified === 'income' ? 'income' : classified === 'transfer' ? 'transfer' : 'expense';
-		const direction = transferDirection(line);
+		let type = classified === 'income' ? 'income' : classified === 'transfer' ? 'transfer' : 'expense';
+		let direction = transferDirection(line);
 		const amountCents = parseMoney(amountMatch[1]);
 		if (!amountCents) {
 			invalid += 1;
@@ -630,7 +724,18 @@ export function linesToTransactions(lines, options = {}) {
 			.replace(/\s{2,}/g, ' ')
 			.replace(/^[\s|•·-]+|[\s|•·-]+$/g, '')
 			.trim();
-		if (!rawDescription) rawDescription = type === 'income' ? 'Imported PDF income' : 'Imported PDF expense';
+		const pair = accountPairFor(rawDescription, methods, { words: false });
+		if (pair) {
+			type = 'transfer';
+			direction = 'out';
+		}
+		if (!rawDescription) {
+			rawDescription = type === 'income'
+				? 'Imported PDF income'
+				: type === 'transfer'
+					? 'Imported PDF transfer'
+					: 'Imported PDF expense';
+		}
 		const methodText = methods.find((method) => matchMethod(rawDescription, [method]) === method.id)?.label || '';
 		let description = rawDescription;
 		if (methodText) {
@@ -648,11 +753,31 @@ export function linesToTransactions(lines, options = {}) {
 			: type === 'transfer'
 				? 'other'
 				: detectCategory(rawDescription) || 'other';
-		const paymentMethodId = matchMethod(methodText, methods) ?? defaultMethodId ?? null;
-		const transferMethodId = type === 'transfer'
-			? matchTransferMethod(rawDescription, methods, paymentMethodId)
-			: null;
-		if (type === 'transfer' && transferMethodId === null) transfersMissingAccount += 1;
+		let paymentMethodId;
+		let transferMethodId;
+		let missingMethod;
+		let missingTransferMethod;
+		let transferAccountText;
+		if (pair) {
+			paymentMethodId = pair.fromId;
+			transferMethodId = pair.toId;
+			missingMethod = pair.missingFrom;
+			missingTransferMethod = pair.missingTo;
+			transferAccountText = pair.to;
+		} else {
+			paymentMethodId = matchMethod(methodText, methods) ?? defaultMethodId ?? null;
+			transferAccountText = type === 'transfer' ? rawDescription : null;
+			transferMethodId = type === 'transfer'
+				? matchTransferMethod(rawDescription, methods, paymentMethodId)
+				: null;
+			missingMethod = null;
+			missingTransferMethod = type === 'transfer' && transferMethodId === null
+				? possibleTransferAccount(rawDescription, methods, paymentMethodId)
+				: null;
+		}
+		if (type === 'transfer' && (transferMethodId === null || paymentMethodId === null)) {
+			transfersMissingAccount += 1;
+		}
 		const transaction = {
 			type,
 			date,
@@ -663,7 +788,13 @@ export function linesToTransactions(lines, options = {}) {
 			paymentMethodId,
 			transferMethodId,
 			direction: type === 'transfer' ? direction : null,
-			methodLabel: methods.find((method) => method.id === paymentMethodId)?.label || '',
+			methodLabel:
+				methods.find((method) => method.id === paymentMethodId)?.label ||
+				missingMethod ||
+				(pair ? pair.from : ''),
+			missingMethod,
+			missingTransferMethod,
+			transferAccountText,
 			source: sourceLabel,
 		};
 		if (type === 'income') {
