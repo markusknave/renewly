@@ -136,6 +136,20 @@ export function linkRowsToMethods(rows, methods, existing = [], links = []) {
 	return finalizeRows(updated, existing).rows;
 }
 
+// Applies a newly chosen default to rows whose statement did not name an
+// account. Explicit account text and resolved missing accounts are untouched.
+export function applyDefaultAccount(rows, methods, defaultMethodId, existing = []) {
+	const method = (Array.isArray(methods) ? methods : []).find(
+		(entry) => String(entry.id) === String(defaultMethodId)
+	);
+	const updated = (Array.isArray(rows) ? rows : []).map((row) =>
+		row?.usesDefault
+			? { ...row, paymentMethodId: method?.id ?? null, methodLabel: method?.label ?? '' }
+			: row
+	);
+	return finalizeRows(updated, existing).rows;
+}
+
 // Creates the accounts the user confirmed. A name that already exists is
 // linked instead of duplicated, so renaming to an existing account is safe.
 export async function createImportAccounts(db, accounts, options = {}) {
@@ -229,6 +243,7 @@ function renewlyBackupRows(data, options) {
 				transferMethodId,
 				direction: type === 'transfer' ? 'out' : null,
 				methodLabel: options.methods.find((method) => method.id === paymentMethodId)?.label || missingMethod || '',
+				usesDefault: !methodText,
 				missingMethod,
 				missingTransferMethod,
 				source: 'Renewly JSON import',

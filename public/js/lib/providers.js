@@ -179,5 +179,8 @@ export function inferPaymentKind(label) {
 	}
 	if (/\b(bank|savings|rural|thrift|credit union)\b/.test(text)) return 'bank';
 	if (/\b(card|visa|mastercard|amex)\b/.test(text)) return 'card';
+	// Cash and cash-like accounts stay distinct from e-wallets. Anything else
+	// (GBonds, GFunds, insurance, crypto exchanges, and similar) is Other.
+	if (/\b(cash|petty cash|on hand|cash box|cashier)\b/.test(text)) return 'cash';
 	return 'other';
 }

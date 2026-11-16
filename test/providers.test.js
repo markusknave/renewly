@@ -29,6 +29,14 @@ test('inferPaymentKind classifies names found in imported statements', () => {
 	assert.equal(inferPaymentKind('ShopeePay'), 'ewallet');
 	assert.equal(inferPaymentKind('BPI Visa'), 'card');
 	assert.equal(inferPaymentKind('Some Rural Bank'), 'bank');
+	assert.equal(inferPaymentKind('Cash on Hand'), 'cash');
+	assert.equal(inferPaymentKind('Petty Cash'), 'cash');
+	assert.equal(inferPaymentKind('Cash'), 'cash');
+	assert.equal(inferPaymentKind('Cashalo'), 'credit');
+	assert.equal(inferPaymentKind('GBonds'), 'other');
+	assert.equal(inferPaymentKind('GFunds'), 'other');
+	assert.equal(inferPaymentKind('Insurance'), 'other');
+	assert.equal(inferPaymentKind('Binance'), 'other');
 	assert.equal(inferPaymentKind('Unknown Account'), 'other');
 });
 

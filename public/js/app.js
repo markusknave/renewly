@@ -4,6 +4,7 @@ import * as finance from './finance.js';
 import { answerQuestion, buildInsights } from './insights.js';
 import {
 	analyzeRows,
+	applyDefaultAccount,
 	createImportAccounts,
 	importRows,
 	linkRowsToMethods,
@@ -57,6 +58,7 @@ const state = {
 	importPreview: null,
 	importBusy: false,
 	importDefaultMethodId: null,
+	importDefaultChosen: false,
 	importOpen: false,
 	importAccounts: null,
 	scanBusy: false,
@@ -148,8 +150,15 @@ async function reload() {
 	) {
 		state.groupFilter = '';
 	}
-	if (!state.importDefaultMethodId && state.methods.length) {
+	if (!state.importDefaultChosen && !state.importDefaultMethodId && state.methods.length) {
 		state.importDefaultMethodId = state.methods[0].id;
+	}
+	if (
+		state.importDefaultMethodId &&
+		state.methods.length &&
+		!state.methods.some((method) => String(method.id) === String(state.importDefaultMethodId))
+	) {
+		state.importDefaultMethodId = state.methods[0]?.id ?? null;
 	}
 	const renamed = state.methods.filter((method) => /^seabank\b/i.test(String(method.label || '').trim()));
 	for (const method of renamed) {
@@ -302,7 +311,7 @@ async function render() {
 			rows: filtered,
 			importPreview: state.importPreview,
 			importBusy: state.importBusy,
-			importDefaultMethodId: state.importDefaultMethodId ?? state.methods[0]?.id ?? null,
+			importDefaultMethodId: state.importDefaultMethodId,
 			importAccounts: state.importAccounts,
 			importMethodsCount: state.methods.length,
 		});
@@ -968,7 +977,7 @@ async function handleImportFile(file) {
 	try {
 		const preview = await parseImportFile(file, {
 			methods: state.methods,
-			defaultMethodId: state.importDefaultMethodId ?? state.methods[0]?.id ?? null,
+			defaultMethodId: state.importDefaultMethodId ?? null,
 			existing: state.transactions,
 			today: todayIso(),
 		});
@@ -1315,18 +1324,49 @@ async function onSubmit(event) {
 		}
 		if (type === 'import-accounts') {
 			const fd = new FormData(form);
+			const defaultChoice = fd.get('defaultMethodId');
+			if (defaultChoice !== null) {
+				state.importDefaultMethodId = readNumber(defaultChoice);
+				state.importDefaultChosen = true;
+			}
 			const accounts = (state.importAccounts || []).map((account, index) => ({
 				...account,
 				selected: fd.get(`account-${index}`) === '1',
 				name: String(fd.get(`name-${index}`) || '').trim() || account.label,
 			}));
-			const { created, links, methods } = await createImportAccounts(state.db, accounts, {
-				today: todayIso(),
-			});
-			state.methods = methods;
+			const selected = accounts.filter((account) => account.selected);
+			if (!selected.length && !state.importDefaultMethodId) {
+				throw new Error('Select at least one account to add, choose a default account, or cancel the import.');
+			}
+			let created = [];
+			let links = [];
+			let methods = state.methods;
+			if (selected.length) {
+				({ created, links, methods } = await createImportAccounts(state.db, accounts, {
+					today: todayIso(),
+				}));
+				state.methods = methods;
+			}
+			const fallbackLinks = state.importDefaultMethodId
+				? accounts
+						.filter((account) => !account.selected)
+						.map((account) => ({
+							sourceLabel: account.label,
+							methodId: state.importDefaultMethodId,
+						}))
+				: [];
 			const preview = state.importPreview;
 			if (preview) {
-				preview.rows = linkRowsToMethods(preview.rows, methods, state.transactions, links);
+				preview.rows = linkRowsToMethods(preview.rows, methods, state.transactions, [
+					...links,
+					...fallbackLinks,
+				]);
+				preview.rows = applyDefaultAccount(
+					preview.rows,
+					methods,
+					state.importDefaultMethodId,
+					state.transactions
+				);
 				refreshImportPreview(preview);
 				state.importPreview = preview;
 			}
@@ -1345,7 +1385,13 @@ async function onSubmit(event) {
 		if (type === 'import-expenses') {
 			const fd = new FormData(form);
 			const defaultMethodId = readNumber(fd.get('defaultMethodId'));
-			const result = await importRows(state.db, state.importPreview?.rows || [], {
+			const rows = applyDefaultAccount(
+				state.importPreview?.rows || [],
+				state.methods,
+				defaultMethodId,
+				state.transactions
+			);
+			const result = await importRows(state.db, rows, {
 				defaultMethodId,
 				existing: state.transactions,
 				today: todayIso(),
@@ -1706,6 +1752,22 @@ async function onChange(event) {
 		await render();
 		return;
 	}
+	if (target.matches('#transaction-import-dialog select[name="defaultMethodId"]')) {
+		state.importDefaultMethodId = readNumber(target.value);
+		state.importDefaultChosen = true;
+		const preview = state.importPreview;
+		if (preview) {
+			preview.rows = applyDefaultAccount(
+				preview.rows,
+				state.methods,
+				state.importDefaultMethodId,
+				state.transactions
+			);
+			refreshImportPreview(preview);
+		}
+		await render();
+		return;
+	}
 	if (target.matches('[data-import-type]')) {
 		const preview = state.importPreview;
 		const index = Number(target.dataset.index);
@@ -1747,6 +1809,7 @@ async function onChange(event) {
 			preview.rows[index] = {
 				...row,
 				paymentMethodId: sourceId,
+				usesDefault: sourceId === null,
 				transferMethodId:
 					sourceId !== null && String(row.transferMethodId) === String(sourceId)
 						? null

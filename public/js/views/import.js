@@ -122,7 +122,13 @@ function analysisPanel(analysis) {
 	</section>`;
 }
 
-export function importAccountsDialog({ accounts = [], fileName = '', methodsCount = 0 }) {
+export function importAccountsDialog({
+	accounts = [],
+	fileName = '',
+	methodsCount = 0,
+	methods = [],
+	defaultMethodId = null,
+}) {
 	if (!accounts.length) return '';
 	return `<dialog class="dialog" id="import-accounts-dialog" aria-labelledby="import-accounts-title">
 		<div class="dialog-head">
@@ -139,6 +145,24 @@ export function importAccountsDialog({ accounts = [], fileName = '', methodsCoun
 						: 'that are not in Renewly yet'
 					: 'in a tracker with no saved accounts'
 			}. Uncheck any you do not want to add, or edit a name to save it under a different label.</p>
+			${
+				methods.length
+					? `<label>Default account
+						<select name="defaultMethodId" data-searchable data-combo-placeholder="Search accounts…">
+							<option value="">No default account</option>
+							${methods
+								.map(
+									(method) =>
+										`<option value="${method.id}"${
+											String(defaultMethodId) === String(method.id) ? ' selected' : ''
+										}>${esc(method.label)}${method.last4 ? ` ···· ${esc(method.last4)}` : ''}</option>`
+								)
+								.join('')}
+						</select>
+						<span class="hint">Rows that do not name an account, and accounts you uncheck, use this one. You can change it again in the review.</span>
+					</label>`
+					: `<p class="hint">No accounts are saved yet, so there is no default to choose. New accounts start at zero on the earliest transaction date.</p>`
+			}
 			<ul class="import-account-list">${accounts
 				.map(
 					(account, index) => `<li class="import-account-item">

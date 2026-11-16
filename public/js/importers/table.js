@@ -251,7 +251,7 @@ export function matchMethod(value, methods = []) {
 	return null;
 }
 
-const GENERIC_METHOD_TEXT = /^(cash|card|credit|debit|account|wallet|bank|other|no method|none|n\/a|-)$/i;
+const GENERIC_METHOD_TEXT = /^(card|credit|debit|account|wallet|bank|other|no method|none|n\/a|-)$/i;
 
 // The account column can name a bank or wallet that is not saved yet. Keep a
 // clean label so the import can offer to create it instead of silently using
@@ -607,6 +607,7 @@ export function rowsToTransactions(rows, options = {}) {
 				missingMethod ||
 				(pair ? pair.from : '') ||
 				(methodText ? '' : methods.find((method) => method.id === defaultMethodId)?.label || ''),
+			usesDefault: !pair && !methodText,
 			missingMethod,
 			missingTransferMethod,
 			transferAccountText,
@@ -792,6 +793,7 @@ export function linesToTransactions(lines, options = {}) {
 				methods.find((method) => method.id === paymentMethodId)?.label ||
 				missingMethod ||
 				(pair ? pair.from : ''),
+			usesDefault: !pair && !methodText,
 			missingMethod,
 			missingTransferMethod,
 			transferAccountText,

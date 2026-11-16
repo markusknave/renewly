@@ -6,12 +6,28 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-2.4-hotfix](https://github.com/markusknave/renewly/releases/tag/beta-2.4-hotfix),
+[beta-2.4-hotfix-2](https://github.com/markusknave/renewly/releases/tag/beta-2.4-hotfix-2),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-2.4-hotfix.apk
+renewly-beta-2.4-hotfix-2.apk
 ```
+
+## What is new in beta-2.4-hotfix-2
+
+- **Cash and Other accounts.** Imported account names that are not cards,
+  e-wallets, bank accounts, or credit lines are still created. Names such as
+  `Cash on Hand` become a Cash account; `GBonds`, `GFunds`, `Insurance`,
+  `Binance`, and other unlisted names become Other accounts.
+- **Default account in the account check.** When missing accounts are found, the
+  modal now has a Default account selector. Rows that do not name an account
+  use it, and unchecked missing accounts are linked to it instead of blocking
+  the import.
+- **The default follows the review.** Changing the default in the review updates
+  every row that relied on it, and the same account is used when the rows are
+  committed.
+- **Container gutters.** Stacked panels on Cards, Settings, Insights, and other
+  screens keep a consistent gap between their borders.
 
 ## What is new in beta-2.4-hotfix
 
@@ -380,51 +396,59 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-2.4-hotfix.apk
+adb install -r renewly-beta-2.4-hotfix-2.apk
 ```
+
+### Updating from beta-2.4-hotfix
+
+Install beta-2.4-hotfix-2 over beta-2.4-hotfix. The signing key, IndexedDB
+schema version 3, and JSON backup format 6 are unchanged, so no uninstall or
+backup restore is required. Cash/Other inference and the Default account
+selector only change new imports; saved accounts stay as they are.
 
 ### Updating from beta-2.3
 
-Install beta-2.4-hotfix over beta-2.3. The signing key, IndexedDB schema version
+Install beta-2.4-hotfix-2 over beta-2.3. The signing key, IndexedDB schema version
 3, and JSON backup format 6 are unchanged, so no uninstall or backup restore is
-required. Imported account pairs are resolved when the file is read; no saved
-data is rewritten.
+required. Imported account pairs are resolved when the file is read, missing
+names keep their Cash or Other type, and the account check can assign one
+default account to rows without an account. No saved data is rewritten.
 
 ### Updating from beta-2.2
 
-Install beta-2.4-hotfix over beta-2.2. The signing key, IndexedDB schema version
+Install beta-2.4-hotfix-2 over beta-2.2. The signing key, IndexedDB schema version
 3, and JSON backup format 6 are unchanged, so no uninstall or backup restore is
 required. The import account check only creates accounts you confirm.
 
 ### Updating from beta-2.1
 
-Install beta-2.4-hotfix over beta-2.1. The signing key, IndexedDB schema version
+Install beta-2.4-hotfix-2 over beta-2.1. The signing key, IndexedDB schema version
 3, and all saved accounts stay in place, so no uninstall or backup restore is
 required. Custom categories are added to the settings record; existing expenses
 and income keep their categories.
 
 ### Updating from beta-1.5
 
-Install beta-2.4-hotfix over beta-1.5. It uses the same signing key and IndexedDB
+Install beta-2.4-hotfix-2 over beta-1.5. It uses the same signing key and IndexedDB
 schema version 3, so no uninstall or backup restore is required. Themes,
 transfers, and custom categories use the existing settings and transaction
 stores.
 
 ### Updating from beta-1.4
 
-Install beta-2.4-hotfix over beta-1.4. It uses the same signing key and the same
+Install beta-2.4-hotfix-2 over beta-1.4. It uses the same signing key and the same
 IndexedDB schema version 3, so no uninstall or backup restore is required. JSON
 backup format 6 imports, and older format 5 backups still import.
 
 ### Updating from beta-1.3
 
-Install beta-2.4-hotfix over beta-1.3. It uses the same signing key and the same
+Install beta-2.4-hotfix-2 over beta-1.3. It uses the same signing key and the same
 IndexedDB schema version 3, so no uninstall or backup restore is required.
-beta-2.4-hotfix imports JSON backups in versions 1 through 6.
+beta-2.4-hotfix-2 imports JSON backups in versions 1 through 6.
 
 ### Updating from beta-1.2-hotfix
 
-Install beta-2.4-hotfix over beta-1.2-hotfix. It uses the same rotated signing
+Install beta-2.4-hotfix-2 over beta-1.2-hotfix. It uses the same rotated signing
 key and the same IndexedDB schema, so no uninstall or backup restore is required.
 
 ### Updating from beta-1.2 or earlier
@@ -435,7 +459,7 @@ different signer, so it will reject an in-place update with
 
 1. Export a JSON backup from **More → Settings**.
 2. Uninstall Renewly once.
-3. Install `renewly-beta-2.4-hotfix.apk`.
+3. Install `renewly-beta-2.4-hotfix-2.apk`.
 4. Restore the JSON backup.
 
 The new certificate SHA-256 fingerprint is:
@@ -447,12 +471,12 @@ The new certificate SHA-256 fingerprint is:
 Verify it with:
 
 ```bash
-apksigner verify --print-certs renewly-beta-2.4-hotfix.apk
+apksigner verify --print-certs renewly-beta-2.4-hotfix-2.apk
 ```
 
 ### Updating from beta-1.1
 
-Installing beta-2.4-hotfix over beta-1.1 keeps the IndexedDB database, but the
+Installing beta-2.4-hotfix-2 over beta-1.1 keeps the IndexedDB database, but the
 signing key changed. Follow the one-time reinstall steps above. There is no
 schema change; the import feature only adds rows through the existing expense
 store.

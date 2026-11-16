@@ -315,6 +315,7 @@ test('import account check lists detected accounts with editable names', () => {
 			{ label: 'BPI Debit', kind: 'card', count: 1, name: 'BPI Debit' },
 		],
 		importMethodsCount: 1,
+		importDefaultMethodId: 1,
 	});
 	assert.match(html, /id="import-accounts-dialog"/);
 	assert.match(html, /data-form="import-accounts"/);
@@ -323,6 +324,8 @@ test('import account check lists detected accounts with editable names', () => {
 	assert.match(html, /2 rows in this file/);
 	assert.match(html, /Add accounts and continue/);
 	assert.match(html, /local analyst read/);
+	assert.match(html, /<select name="defaultMethodId" data-searchable/);
+	assert.match(html, /<option value="1" selected>MariBank/);
 });
 
 test('import preview lets a transfer use the default source account', () => {

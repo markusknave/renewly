@@ -447,6 +447,7 @@ export async function readMmbak(bytes, options = {}) {
 				missingMethod ||
 				(pair ? pair.from : '') ||
 				(assetText ? '' : methods.find((method) => method.id === defaultMethodId)?.label || ''),
+			usesDefault: !pair && !assetText,
 			missingMethod,
 			missingTransferMethod,
 			transferAccountText,

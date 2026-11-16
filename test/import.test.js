@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import {
 	parseImportFile,
 	importRows,
+	applyDefaultAccount,
 	recategorizeRows,
 	analyzeRows,
 	createImportAccounts,
@@ -344,6 +345,83 @@ test('imports create renamed cards and wallets from the account check', async ()
 	assert.equal(transactions.length, 2);
 	assert.equal(methodBalance(atome, transactions, '2026-11-30'), -120_000);
 	assert.equal(methodBalance(bpi, transactions, '2026-11-30'), 85_000);
+});
+
+test('changing the default account updates rows that did not name one', () => {
+	const parsed = rowsToTransactions(
+		[
+			['Date', 'Description', 'Amount', 'Account'],
+			['2026-11-01', 'Petty item', '50.00', ''],
+			['2026-11-02', 'Maya item', '60.00', 'Maya'],
+		],
+		{ methods, defaultMethodId: 1 }
+	);
+	assert.equal(parsed.rows[0].usesDefault, true);
+	assert.equal(parsed.rows[1].usesDefault, false);
+	const switched = applyDefaultAccount(parsed.rows, methods, 2, []);
+	assert.equal(switched[0].paymentMethodId, 2);
+	assert.equal(switched[0].methodLabel, 'Maya');
+	assert.equal(switched[1].paymentMethodId, 2);
+	const cleared = applyDefaultAccount(parsed.rows, methods, null, []);
+	assert.equal(cleared[0].paymentMethodId, null);
+	assert.equal(cleared[0].methodLabel, '');
+	assert.equal(cleared[1].paymentMethodId, 2);
+});
+
+test('cash and other account names import with inferred account types', async () => {
+	const db = createMemoryBackend();
+	const csv = [
+		'Date,Description,Amount,Account',
+		'2026-11-10,Groceries,500.00,Cash on Hand',
+		'2026-11-11,Bond purchase,1000.00,GBonds',
+		'2026-11-12,Fund purchase,1000.00,GFunds',
+		'2026-11-13,Insurance premium,800.00,Insurance',
+		'2026-11-14,Crypto buy,700.00,Binance',
+	].join('\n');
+	const preview = await parseImportFile(fileLike('types.csv', csv, 'text/csv'), {
+		methods: [],
+		today: '2026-11-16',
+	});
+	assert.deepEqual(
+		preview.missingMethods.map((account) => [account.label, account.kind]),
+		[
+			['Binance', 'other'],
+			['Cash on Hand', 'cash'],
+			['GBonds', 'other'],
+			['GFunds', 'other'],
+			['Insurance', 'other'],
+		]
+	);
+	const cashPreview = await parseImportFile(
+		fileLike(
+			'cash.csv',
+			'Date,Description,Amount,Account\n2026-11-15,Cash item,10.00,Cash',
+			'text/csv'
+		),
+		{ methods: [], today: '2026-11-16' }
+	);
+	assert.deepEqual(cashPreview.missingMethods, [
+		{ label: 'Cash', kind: 'cash', count: 1, earliest: '2026-11-15' },
+	]);
+	const { created, links, methods: saved } = await createImportAccounts(
+		db,
+		preview.missingMethods.map((account) => ({ ...account, selected: true })),
+		{ today: '2026-11-16' }
+	);
+	assert.deepEqual(
+		created.map((account) => [account.label, account.kind]),
+		[
+			['Binance', 'other'],
+			['Cash on Hand', 'cash'],
+			['GBonds', 'other'],
+			['GFunds', 'other'],
+			['Insurance', 'other'],
+		]
+	);
+	const linked = linkRowsToMethods(preview.rows, saved, [], links);
+	const result = await importRows(db, linked, { existing: [], today: '2026-11-16' });
+	assert.equal(result.imported, 5);
+	assert.equal(result.failed, 0);
 });
 
 test('missing transfer destinations join the account check', async () => {
