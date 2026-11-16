@@ -11,7 +11,7 @@ import {
 } from '../lib/categories.js';
 import { RANGE_PRESETS, transactionSignedCents } from '../finance.js';
 import { categoryBadge, esc, icon, options } from './shared.js';
-import { importView } from './import.js';
+import { importAccountsDialog, importView } from './import.js';
 
 const TYPE_LABELS = {
 	expense: 'Expense',
@@ -277,6 +277,8 @@ export function expensesView({
 	importPreview = null,
 	importBusy = false,
 	importDefaultMethodId = null,
+	importAccounts = null,
+	importMethodsCount = 0,
 }) {
 	const preset = filters.preset || 'this_month';
 	const expenseCategories = categoriesFor('expense');
@@ -381,6 +383,11 @@ export function expensesView({
 	${expenseDialog({ methods, today })}
 	${categoryDialog()}
 	${exportDialog({ from: range.from, to: range.to, count: rows.length })}
+	${importAccountsDialog({
+		accounts: importAccounts || [],
+		fileName: importPreview?.fileName || '',
+		methodsCount: importMethodsCount,
+	})}
 	${importView({
 		methods,
 		preview: importPreview,

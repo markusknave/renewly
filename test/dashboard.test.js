@@ -297,6 +297,32 @@ test('import review renders the drop zone, analyst summary, and commit form', ()
 	assert.match(html, /data-import-type/);
 	assert.match(html, /Import 2 transactions/);
 	assert.match(html, /Analyst top category/);
+	assert.doesNotMatch(html, /createMissingMethods/);
+});
+
+test('import account check lists detected accounts with editable names', () => {
+	const range = monthRange(today);
+	const summary = summarizePeriod(transactions, range);
+	const html = expensesView({
+		today,
+		methods,
+		filters: { preset: 'this_month', query: '', category: '', methodId: '' },
+		range,
+		summary,
+		rows: transactions,
+		importAccounts: [
+			{ label: 'Atome', kind: 'credit', count: 2, name: 'Atome' },
+			{ label: 'BPI Debit', kind: 'card', count: 1, name: 'BPI Debit' },
+		],
+		importMethodsCount: 1,
+	});
+	assert.match(html, /id="import-accounts-dialog"/);
+	assert.match(html, /data-form="import-accounts"/);
+	assert.match(html, /name="name-0" value="Atome"/);
+	assert.match(html, /name="name-1" value="BPI Debit"/);
+	assert.match(html, /2 rows in this file/);
+	assert.match(html, /Add accounts and continue/);
+	assert.match(html, /local analyst read/);
 });
 
 test('import preview lets a transfer use the default source account', () => {
