@@ -6,12 +6,33 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-2.2](https://github.com/markusknave/renewly/releases/tag/beta-2.2),
+[beta-2.3](https://github.com/markusknave/renewly/releases/tag/beta-2.3),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-2.2.apk
+renewly-beta-2.3.apk
 ```
+
+## What is new in beta-2.3
+
+- **Accounts are checked before an import.** After a CSV, Excel, PDF, or Money
+  Manager file is read, Renewly compares every account named by the file with
+  the accounts saved on the device. Missing ones open in a **Check the accounts**
+  modal before the transaction review.
+- **Create, rename, or skip each account.** The modal lists the detected type
+  and row count for every missing account with an editable name. Rename one
+  before it is created, keep the detected name, or uncheck it. Confirmed
+  accounts start at zero on the earliest transaction date.
+- **Renaming to an existing account links instead of duplicating.** If the new
+  name already belongs to a saved account, the rows use that account. Transfer
+  destinations named in descriptions such as `InstaPay to GCash` are included
+  in the check.
+- **Android back returns to the previous tab.** The system back button now walks
+  the WebView's tab history and only closes the app at the first screen instead
+  of exiting immediately.
+- **Clearer import review.** Rows are re-linked and re-checked for duplicates
+  after account creation, and files with no detectable account warn when the
+  tracker has no accounts to assign.
 
 ## What is new in beta-2.2
 
@@ -341,38 +362,44 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-2.2.apk
+adb install -r renewly-beta-2.3.apk
 ```
+
+### Updating from beta-2.2
+
+Install beta-2.3 over beta-2.2. The signing key, IndexedDB schema version 3, and
+JSON backup format 6 are unchanged, so no uninstall or backup restore is
+required. The import account check only creates accounts you confirm.
 
 ### Updating from beta-2.1
 
-Install beta-2.2 over beta-2.1. The signing key, IndexedDB schema version 3, and
+Install beta-2.3 over beta-2.1. The signing key, IndexedDB schema version 3, and
 all saved accounts stay in place, so no uninstall or backup restore is required.
 Custom categories are added to the settings record; existing expenses and income
 keep their categories.
 
 ### Updating from beta-1.5
 
-Install beta-2.2 over beta-1.5. It uses the same signing key and IndexedDB
+Install beta-2.3 over beta-1.5. It uses the same signing key and IndexedDB
 schema version 3, so no uninstall or backup restore is required. Themes,
 transfers, and custom categories use the existing settings and transaction
 stores.
 
 ### Updating from beta-1.4
 
-Install beta-2.2 over beta-1.4. It uses the same signing key and the same
+Install beta-2.3 over beta-1.4. It uses the same signing key and the same
 IndexedDB schema version 3, so no uninstall or backup restore is required. JSON
 backup format 6 imports, and older format 5 backups still import.
 
 ### Updating from beta-1.3
 
-Install beta-2.2 over beta-1.3. It uses the same signing key and the same
-IndexedDB schema version 3, so no uninstall or backup restore is required. beta-2.2
-imports JSON backups in versions 1 through 6.
+Install beta-2.3 over beta-1.3. It uses the same signing key and the same
+IndexedDB schema version 3, so no uninstall or backup restore is required.
+beta-2.3 imports JSON backups in versions 1 through 6.
 
 ### Updating from beta-1.2-hotfix
 
-Install beta-2.2 over beta-1.2-hotfix. It uses the same rotated signing key and
+Install beta-2.3 over beta-1.2-hotfix. It uses the same rotated signing key and
 the same IndexedDB schema, so no uninstall or backup restore is required.
 
 ### Updating from beta-1.2 or earlier
@@ -383,7 +410,7 @@ different signer, so it will reject an in-place update with
 
 1. Export a JSON backup from **More → Settings**.
 2. Uninstall Renewly once.
-3. Install `renewly-beta-2.2.apk`.
+3. Install `renewly-beta-2.3.apk`.
 4. Restore the JSON backup.
 
 The new certificate SHA-256 fingerprint is:
@@ -395,12 +422,12 @@ The new certificate SHA-256 fingerprint is:
 Verify it with:
 
 ```bash
-apksigner verify --print-certs renewly-beta-2.2.apk
+apksigner verify --print-certs renewly-beta-2.3.apk
 ```
 
 ### Updating from beta-1.1
 
-Installing beta-2.2 over beta-1.1 keeps the IndexedDB database, but the
+Installing beta-2.3 over beta-1.1 keeps the IndexedDB database, but the
 signing key changed. Follow the one-time reinstall steps above. There is no
 schema change; the import feature only adds rows through the existing expense
 store.
