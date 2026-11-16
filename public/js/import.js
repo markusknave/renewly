@@ -58,6 +58,131 @@ function methodKey(value) {
 		.replace(/[^a-z0-9]+/g, '');
 }
 
+// Accounts named by the file but absent from the tracker. The pre-import
+// dialog uses this list to create or rename them before any row is committed.
+export function missingAccountsFor(rows) {
+	const found = new Map();
+	for (const row of Array.isArray(rows) ? rows : []) {
+		if (!row || row.duplicate) continue;
+		const names = [];
+		if (row.paymentMethodId === null || row.paymentMethodId === undefined) {
+			if (row.missingMethod) names.push(row.missingMethod);
+		}
+		if (row.transferMethodId === null || row.transferMethodId === undefined) {
+			if (row.missingTransferMethod) names.push(row.missingTransferMethod);
+		}
+		for (const raw of names) {
+			const label = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+			if (!label) continue;
+			const key = methodKey(label);
+			if (!key) continue;
+			const current = found.get(key);
+			if (!current) {
+				found.set(key, {
+					label,
+					kind: inferPaymentKind(label),
+					count: 1,
+					earliest: row.date || null,
+				});
+				continue;
+			}
+			current.count += 1;
+			if (row.date && (!current.earliest || row.date < current.earliest)) current.earliest = row.date;
+		}
+	}
+	return [...found.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+// Points preview rows at accounts that now exist. `links` maps the label the
+// file used to the account it should use, so a renamed account still matches.
+export function linkRowsToMethods(rows, methods, existing = [], links = []) {
+	const byKey = new Map(
+		(Array.isArray(methods) ? methods : []).map((method) => [methodKey(method.label), method])
+	);
+	const resolved = new Map(
+		(Array.isArray(links) ? links : []).map((link) => [
+			methodKey(link.sourceLabel),
+			link.methodId,
+		])
+	);
+	const updated = (Array.isArray(rows) ? rows : []).map((row) => {
+		if (!row) return row;
+		let next = row;
+		if (next.missingMethod) {
+			const sourceKey = methodKey(next.missingMethod);
+			const method = resolved.has(sourceKey)
+				? (methods || []).find((entry) => String(entry.id) === String(resolved.get(sourceKey)))
+				: byKey.get(sourceKey);
+			if (method) {
+				next = {
+					...next,
+					paymentMethodId: method.id,
+					methodLabel: method.label,
+					missingMethod: null,
+				};
+			}
+		}
+		if (next.missingTransferMethod) {
+			const sourceKey = methodKey(next.missingTransferMethod);
+			const method = resolved.has(sourceKey)
+				? (methods || []).find((entry) => String(entry.id) === String(resolved.get(sourceKey)))
+				: byKey.get(sourceKey);
+			if (method && String(method.id) !== String(next.paymentMethodId)) {
+				next = { ...next, transferMethodId: method.id, missingTransferMethod: null };
+			}
+		}
+		return next;
+	});
+	return finalizeRows(updated, existing).rows;
+}
+
+// Creates the accounts the user confirmed. A name that already exists is
+// linked instead of duplicated, so renaming to an existing account is safe.
+export async function createImportAccounts(db, accounts, options = {}) {
+	const list = (Array.isArray(accounts) ? accounts : []).filter(Boolean);
+	const existing = await store.listPaymentMethods(db);
+	const byKey = new Map(existing.map((method) => [methodKey(method.label), method]));
+	const selected = list.filter((account) => account.selected !== false);
+	if (!selected.length) throw new Error('Select at least one account to add, or cancel the import.');
+	const names = new Set();
+	for (const account of selected) {
+		const label = String(account.name || account.label || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+		if (!label) throw new Error('Give every selected account a name, or uncheck it.');
+		const key = methodKey(label);
+		if (!key) throw new Error(`"${label}" is not a usable account name.`);
+		if (names.has(key)) throw new Error(`Two selected accounts would both be named ${label}.`);
+		names.add(key);
+	}
+
+	const created = [];
+	const links = [];
+	for (const account of selected) {
+		const label = String(account.name || account.label || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+		const key = methodKey(label);
+		let method = byKey.get(key);
+		if (!method) {
+			const kind = account.kind || inferPaymentKind(label);
+			method = await store.savePaymentMethod(db, {
+				label,
+				kind,
+				instrument: instrumentFor(kind),
+				openingBalanceCents: 0,
+				openingDate: account.earliest || options.today,
+				notes: 'Created from an imported statement. Set the starting balance if the statement did not start at zero.',
+			});
+			byKey.set(key, method);
+			created.push({ id: method.id, label: method.label, kind });
+		}
+		links.push({
+			sourceLabel: String(account.label || label),
+			methodId: method.id,
+			label: method.label,
+			created: !existing.some((entry) => String(entry.id) === String(method.id)),
+		});
+	}
+	return { created, links, methods: await store.listPaymentMethods(db) };
+}
+
 function renewlyBackupRows(data, options) {
 	const methodNames = new Map(
 		(Array.isArray(data.paymentMethods) ? data.paymentMethods : []).map((method) => [
@@ -84,6 +209,8 @@ function renewlyBackupRows(data, options) {
 			const targetText = methodNames.get(String(transaction.toPaymentMethodId ?? '')) || '';
 			const transferMethodId =
 				type === 'transfer' ? matchMethod(targetText, options.methods) ?? null : null;
+			const missingTransferMethod =
+				type === 'transfer' ? missingMethodLabel(targetText, transferMethodId) : null;
 			return {
 				type,
 				date: transaction.date,
@@ -103,6 +230,7 @@ function renewlyBackupRows(data, options) {
 				direction: type === 'transfer' ? 'out' : null,
 				methodLabel: options.methods.find((method) => method.id === paymentMethodId)?.label || missingMethod || '',
 				missingMethod,
+				missingTransferMethod,
 				source: 'Renewly JSON import',
 			};
 		})
@@ -296,11 +424,7 @@ export async function parseImportFile(file, options = {}) {
 			(row) => row.type === 'transfer' && row.transferMethodId === null
 		).length,
 	};
-	const missingMethods = [...new Set(
-		rows
-			.filter((row) => !row.duplicate && row.missingMethod)
-			.map((row) => row.missingMethod)
-	)].map((label) => ({ label, kind: inferPaymentKind(label) }));
+	const missingMethods = missingAccountsFor(rows);
 	return {
 		fileName: name,
 		format: formatLabel(extension),
@@ -316,47 +440,11 @@ export async function importRows(db, rows, options = {}) {
 	const {
 		defaultMethodId = null,
 		existing = [],
-		createMissingMethods = false,
-		today = new Date().toISOString().slice(0, 10),
 	} = options;
 	const existingMethods = await store.listPaymentMethods(db);
 	const methodMap = new Map(
 		existingMethods.map((method) => [methodKey(method.label), method.id])
 	);
-	const missing = new Map();
-	for (const row of rows || []) {
-		if (row.duplicate || !row.missingMethod) continue;
-		const key = methodKey(row.missingMethod);
-		if (methodMap.has(key)) continue;
-		const current = missing.get(key);
-		if (!current || (row.date && row.date < current.earliest)) {
-			missing.set(key, { label: row.missingMethod, earliest: row.date || current?.earliest || today });
-		}
-	}
-	const createdMethods = [];
-	if (createMissingMethods) {
-		for (const [key, entry] of missing) {
-			const kind = inferPaymentKind(entry.label);
-			try {
-				const method = await store.savePaymentMethod(db, {
-					label: entry.label,
-					kind,
-					instrument: instrumentFor(kind),
-					openingBalanceCents: 0,
-					openingDate: entry.earliest || today,
-					notes: 'Created from an imported statement. Set the starting balance if the statement did not start at zero.',
-				});
-				methodMap.set(key, method.id);
-				createdMethods.push({ id: method.id, label: method.label, kind });
-			} catch {
-				// A concurrent or duplicate record can still be matched by label.
-				const match = (await store.listPaymentMethods(db)).find(
-					(method) => methodKey(method.label) === key
-				);
-				if (match) methodMap.set(key, match.id);
-			}
-		}
-	}
 	const keys = new Set(
 		(existing || [])
 			.filter((row) => row && ['expense', 'income', 'transfer'].includes(row.type))
@@ -439,7 +527,6 @@ export async function importRows(db, rows, options = {}) {
 		skipped,
 		failed,
 		needsAccount,
-		createdMethods,
 	};
 }
 

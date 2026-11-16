@@ -122,6 +122,50 @@ function analysisPanel(analysis) {
 	</section>`;
 }
 
+export function importAccountsDialog({ accounts = [], fileName = '', methodsCount = 0 }) {
+	if (!accounts.length) return '';
+	return `<dialog class="dialog" id="import-accounts-dialog" aria-labelledby="import-accounts-title">
+		<div class="dialog-head">
+			<h2 id="import-accounts-title">Check the accounts</h2>
+			<button class="icon-btn" type="button" data-action="close-import-accounts" aria-label="Close">${icon('close')}</button>
+		</div>
+		<form class="dialog-body stack" data-form="import-accounts">
+			<p class="muted small">The local analyst read <strong>${esc(fileName)}</strong> and found ${
+				accounts.length
+			} account${accounts.length === 1 ? '' : 's'} ${
+				methodsCount
+					? accounts.length === 1
+						? 'that is not in Renewly yet'
+						: 'that are not in Renewly yet'
+					: 'in a tracker with no saved accounts'
+			}. Uncheck any you do not want to add, or edit a name to save it under a different label.</p>
+			<ul class="import-account-list">${accounts
+				.map(
+					(account, index) => `<li class="import-account-item">
+						<label class="check-row import-account-check">
+							<input type="checkbox" name="account-${index}" value="1" checked data-import-account-toggle />
+							<span><strong>${esc(account.label)}</strong><span class="muted small">${esc(
+								PAYMENT_KIND_LABELS[account.kind] || 'Account'
+							)} · ${account.count} row${account.count === 1 ? '' : 's'} in this file</span></span>
+						</label>
+						<label>Name in Renewly
+							<input type="text" name="name-${index}" value="${esc(
+								account.name || account.label
+							)}" maxlength="60" autocomplete="off" data-import-account-name data-index="${index}" />
+						</label>
+					</li>`
+				)
+				.join('')}</ul>
+			<p class="hint">Created accounts start at zero on the earliest transaction date. You can set the real starting balance on the Cards tab afterward.</p>
+			<p class="banner banner-error" data-dialog-error role="alert" hidden></p>
+			<div class="form-actions">
+				<button class="btn" type="button" data-action="close-import-accounts">Cancel</button>
+				<button class="btn btn-primary" type="submit">Add accounts and continue</button>
+			</div>
+		</form>
+	</dialog>`;
+}
+
 export function importView({ methods = [], preview = null, busy = false, defaultMethodId = null }) {
 	const rows = preview?.rows || [];
 	const ready = rows.filter(
@@ -134,7 +178,6 @@ export function importView({ methods = [], preview = null, busy = false, default
 	).length;
 	const duplicateCount = rows.filter((row) => row.duplicate).length;
 	const stats = preview?.stats || null;
-	const missingMethods = preview?.missingMethods || [];
 
 	return `<dialog class="dialog dialog-wide" id="transaction-import-dialog" aria-labelledby="import-dialog-title">
 		<div class="dialog-head">
@@ -177,20 +220,8 @@ export function importView({ methods = [], preview = null, busy = false, default
 						}
 						<form class="stack" data-form="import-expenses">
 							${
-								missingMethods.length
-									? `<label class="check-row">
-										<input type="checkbox" name="createMissingMethods" value="1" checked />
-										<span>Create ${missingMethods.length} missing account${
-											missingMethods.length === 1 ? '' : 's'
-										}: ${missingMethods
-											.map(
-												(method) =>
-													`<strong>${esc(method.label)}</strong> <span class="muted small">${esc(
-														PAYMENT_KIND_LABELS[method.kind] || method.kind
-													)}</span>`
-											)
-											.join(', ')}</span>
-									</label>`
+								methods.length === 0
+									? `<p class="banner banner-error">No accounts are saved in Renewly yet. Rows without an account will import unassigned, so balances will not change.</p>`
 									: ''
 							}
 							<div class="import-toolbar">

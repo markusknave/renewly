@@ -207,11 +207,13 @@ renewly-beta-2.2.apk
   file, review the parsed rows in the modal, then import. The preview stacks
   each row as a card, so it fits the phone screen without horizontal scrolling.
 - The local analyst infers categories from the description and notes, and
-  matches account/card names to your saved payment methods. When the statement
-  names a card or wallet you have not saved, the preview lists it under
-  **Create missing accounts** (checked by default) and creates it with the
-  inferred type: bank account, e-wallet, card, or Credit / BNPL. Clear the
-  checkbox to send those rows to the default account instead.
+  matches account/card names to your saved payment methods. Before the review
+  opens, it checks every account named by the file against your tracker. Missing
+  accounts appear in a **Check the accounts** modal with the detected type and
+  row count. Each one can keep its name, be renamed, or be unchecked. Confirmed
+  accounts are created with a zero starting balance on the earliest transaction
+  date; renaming to an existing account links the rows to it instead of creating
+  a duplicate.
 - Debit, withdrawal, and expense rows become expenses. Credit, deposit, salary,
   refund, and income rows become income. Transfer, InstaPay, PESONet, and
   "sent to"/"received from" rows become transfers; the preview matches the
@@ -422,6 +424,9 @@ install, use the APK above or serve `public/` over HTTPS.
 
 The native project lives in `android/`. Capacitor copies `public/` into the app,
 so the APK runs with no network and no configured server URL.
+
+The Android system back button walks the WebView's tab history, so it returns to
+the previous tab. It only closes the app when there is no earlier entry.
 
 ### Home-screen widget
 

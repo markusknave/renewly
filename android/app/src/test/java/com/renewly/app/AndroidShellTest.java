@@ -1,6 +1,7 @@
 package com.renewly.app;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -19,6 +20,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowAppWidgetManager;
+import org.robolectric.shadows.ShadowWebView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -55,6 +57,44 @@ public class AndroidShellTest {
         WebView webView = activity.getBridge().getWebView();
         assertNotNull(webView);
         assertTrue(webView.getSettings().getJavaScriptEnabled());
+    }
+
+    @Test
+    @Config(sdk = 28)
+    public void hardwareBackWalksWebHistoryBeforeFinishing() {
+        android.content.pm.PackageInfo webViewInfo = new android.content.pm.PackageInfo();
+        webViewInfo.packageName = "com.google.android.webview";
+        webViewInfo.versionName = "120.0.6099.144";
+        org.robolectric.shadows.ShadowWebView.setCurrentWebViewPackage(webViewInfo);
+
+        MainActivity activity = Robolectric.buildActivity(MainActivity.class).setup().get();
+        WebView webView = activity.getBridge().getWebView();
+        ShadowWebView shadowWebView = Shadows.shadowOf(webView);
+
+        shadowWebView.setCanGoBack(true);
+        activity.onBackPressed();
+
+        assertEquals(1, shadowWebView.getGoBackInvocations());
+        assertFalse(activity.isFinishing());
+    }
+
+    @Test
+    @Config(sdk = 28)
+    public void hardwareBackAtTheRootFinishesTheActivity() {
+        android.content.pm.PackageInfo webViewInfo = new android.content.pm.PackageInfo();
+        webViewInfo.packageName = "com.google.android.webview";
+        webViewInfo.versionName = "120.0.6099.144";
+        org.robolectric.shadows.ShadowWebView.setCurrentWebViewPackage(webViewInfo);
+
+        MainActivity activity = Robolectric.buildActivity(MainActivity.class).setup().get();
+        WebView webView = activity.getBridge().getWebView();
+        ShadowWebView shadowWebView = Shadows.shadowOf(webView);
+        shadowWebView.setCanGoBack(false);
+
+        activity.onBackPressed();
+
+        assertEquals(0, shadowWebView.getGoBackInvocations());
+        assertTrue(activity.isFinishing());
     }
 
     @Test

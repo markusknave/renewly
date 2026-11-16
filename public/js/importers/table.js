@@ -302,6 +302,30 @@ export function transferDirection(text) {
 	return 'out';
 }
 
+// The other side of a transfer is often named in the description ("InstaPay to
+// GCash"). When it is not a saved account, keep the short name so the pre-import
+// account check can offer to add it. Long prose is ignored.
+export function possibleTransferAccount(value, methods = [], excludeId = null) {
+	let text = String(value ?? '').replace(/\s+/g, ' ').trim();
+	if (!text) return null;
+	if (matchTransferMethod(text, methods, excludeId) !== null) return null;
+	for (const method of methods) {
+		const label = String(method?.label ?? '').trim();
+		if (!label) continue;
+		text = text.replace(new RegExp(`\\b${escapeRegex(label)}\\b`, 'gi'), ' ');
+	}
+	const match = text.replace(/\s+/g, ' ').match(/\b(?:to|from|via|into)\s+([A-Za-z0-9][A-Za-z0-9 .&'_-]{1,38})/i);
+	if (!match) return null;
+	const label = match[1]
+		.replace(/\b(?:using|through|ref|reference|instapay|pesonet|funds?|transfer|payment)\b.*$/i, '')
+		.replace(/[.,;:]+$/g, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, 60);
+	if (!label || label.split(/\s+/).length > 4) return null;
+	return missingMethodLabel(label, null);
+}
+
 export function duplicateKey(row, paymentMethodId = null, transferMethodId = null) {
 	const otherAccount = row?.type === 'transfer'
 		? transferMethodId ?? row.transferMethodId ?? row.toPaymentMethodId ?? ''
@@ -465,12 +489,14 @@ export function rowsToTransactions(rows, options = {}) {
 		const matchedMethodId = matchMethod(methodText, methods);
 		const missingMethod = missingMethodLabel(methodText, matchedMethodId);
 		const paymentMethodId = matchedMethodId ?? (methodText ? null : defaultMethodId ?? null);
+		const transferAccountText = type === 'transfer'
+			? `${description} ${notes}`.trim()
+			: null;
 		const transferMethodId = type === 'transfer'
-			? matchTransferMethod(
-					`${description} ${notes} ${methodText}`,
-					methods,
-					paymentMethodId
-				)
+			? matchTransferMethod(transferAccountText, methods, paymentMethodId)
+			: null;
+		const missingTransferMethod = type === 'transfer' && transferMethodId === null
+			? possibleTransferAccount(transferAccountText, methods, paymentMethodId)
 			: null;
 		if (type === 'transfer' && transferMethodId === null) transfersMissingAccount += 1;
 		const transaction = {
@@ -488,6 +514,8 @@ export function rowsToTransactions(rows, options = {}) {
 				missingMethod ||
 				(methodText ? '' : methods.find((method) => method.id === defaultMethodId)?.label || ''),
 			missingMethod,
+			missingTransferMethod,
+			transferAccountText,
 			source: sourceLabel,
 		};
 		if (type === 'income') {

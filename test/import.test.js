@@ -5,7 +5,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { parseImportFile, importRows, recategorizeRows, analyzeRows } from '../public/js/import.js';
+import {
+	parseImportFile,
+	importRows,
+	recategorizeRows,
+	analyzeRows,
+	createImportAccounts,
+	linkRowsToMethods,
+	missingAccountsFor,
+} from '../public/js/import.js';
 import { parseCsv } from '../public/js/importers/csv.js';
 import { readXlsx, readZip } from '../public/js/importers/xlsx.js';
 import { extractPdfText } from '../public/js/importers/pdf.js';
@@ -259,7 +267,6 @@ test('importRows commits expenses and income and skips duplicates', async () => 
 		skipped: 1,
 		failed: 0,
 		needsAccount: 0,
-		createdMethods: [],
 	});
 	const second = await importRows(db, rows, { existing: await listTransactions(db) });
 	assert.deepEqual(second, {
@@ -270,7 +277,6 @@ test('importRows commits expenses and income and skips duplicates', async () => 
 		skipped: 3,
 		failed: 0,
 		needsAccount: 0,
-		createdMethods: [],
 	});
 	const transactions = await listTransactions(db);
 	assert.equal(transactions.length, 2);
@@ -280,7 +286,7 @@ test('importRows commits expenses and income and skips duplicates', async () => 
 	assert.equal(methodBalance(account, transactions, '2026-11-30'), 137_450);
 });
 
-test('imports create missing cards and wallets from the account column', async () => {
+test('imports create renamed cards and wallets from the account check', async () => {
 	const db = createMemoryBackend();
 	const bpi = await savePaymentMethod(db, {
 		label: 'BPI Debit',
@@ -297,22 +303,34 @@ test('imports create missing cards and wallets from the account column', async (
 		fileLike('statement.csv', csv, 'text/csv'),
 		{ methods: [bpi], defaultMethodId: bpi.id, today: '2026-11-13' }
 	);
-	assert.deepEqual(preview.missingMethods, [{ label: 'Atome', kind: 'credit' }]);
+	assert.deepEqual(preview.missingMethods, [
+		{ label: 'Atome', kind: 'credit', count: 1, earliest: '2026-11-02' },
+	]);
 	const atomeRow = preview.rows.find((row) => row.merchant === 'Atome order');
 	assert.equal(atomeRow.paymentMethodId, null);
 	assert.equal(atomeRow.missingMethod, 'Atome');
 
-	const result = await importRows(db, preview.rows, {
+	const { created, links, methods } = await createImportAccounts(
+		db,
+		[{ ...preview.missingMethods[0], name: 'Atome Card', selected: true }],
+		{ today: '2026-11-13' }
+	);
+	assert.equal(created.length, 1);
+	assert.equal(created[0].label, 'Atome Card');
+	assert.equal(created[0].kind, 'credit');
+	const linked = linkRowsToMethods(preview.rows, methods, [], links);
+	const linkedAtome = linked.find((row) => row.merchant === 'Atome order');
+	assert.equal(linkedAtome.paymentMethodId, created[0].id);
+	assert.equal(linkedAtome.missingMethod, null);
+	assert.deepEqual(missingAccountsFor(linked), []);
+
+	const result = await importRows(db, linked, {
 		defaultMethodId: bpi.id,
 		existing: [],
-		createMissingMethods: true,
 		today: '2026-11-13',
 	});
-	assert.equal(result.createdMethods.length, 1);
-	assert.equal(result.createdMethods[0].label, 'Atome');
-	assert.equal(result.createdMethods[0].kind, 'credit');
-	const methods = await listPaymentMethods(db);
-	const atome = methods.find((method) => method.label === 'Atome');
+	assert.equal(result.imported, 2);
+	const atome = (await listPaymentMethods(db)).find((method) => method.label === 'Atome Card');
 	assert.equal(atome.kind, 'credit');
 	assert.equal(atome.instrument, 'credit');
 	assert.equal(atome.openingBalanceCents, 0);
@@ -322,7 +340,78 @@ test('imports create missing cards and wallets from the account column', async (
 	assert.equal(methodBalance(bpi, transactions, '2026-11-30'), 85_000);
 });
 
-test('missing accounts fall back to the default when creation is off', async () => {
+test('missing transfer destinations join the account check', async () => {
+	const db = createMemoryBackend();
+	const bpi = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card' });
+	const preview = await parseImportFile(
+		fileLike(
+			'transfers.csv',
+			'Date,Description,Amount,Type,Account\n2026-11-02,InstaPay to GCash,500.00,Transfer,BPI Debit',
+			'text/csv'
+		),
+		{ methods: [bpi], today: '2026-11-13' }
+	);
+	assert.deepEqual(preview.missingMethods, [
+		{ label: 'GCash', kind: 'ewallet', count: 1, earliest: '2026-11-02' },
+	]);
+	const transferRow = preview.rows[0];
+	assert.equal(transferRow.type, 'transfer');
+	assert.equal(transferRow.missingTransferMethod, 'GCash');
+	assert.equal(transferRow.transferMethodId, null);
+
+	const { created, links, methods } = await createImportAccounts(
+		db,
+		[{ ...preview.missingMethods[0], name: 'GCash', selected: true }],
+		{ today: '2026-11-13' }
+	);
+	assert.equal(created.length, 1);
+	const linked = linkRowsToMethods(preview.rows, methods, [], links);
+	assert.equal(linked[0].transferMethodId, created[0].id);
+	assert.equal(linked[0].missingTransferMethod, null);
+});
+
+test('renaming a detected account to an existing label links instead of creating', async () => {
+	const db = createMemoryBackend();
+	const bpi = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card' });
+	const preview = await parseImportFile(
+		fileLike('statement.csv', 'Date,Description,Amount,Account\n2026-11-02,Atome order,1200.00,Atome', 'text/csv'),
+		{ methods: [bpi], today: '2026-11-13' }
+	);
+	const { created, links, methods } = await createImportAccounts(
+		db,
+		[{ ...preview.missingMethods[0], name: 'BPI Debit', selected: true }],
+		{ today: '2026-11-13' }
+	);
+	assert.equal(created.length, 0);
+	assert.equal(links.length, 1);
+	assert.equal(links[0].methodId, bpi.id);
+	assert.equal(methods.length, 1);
+	const linked = linkRowsToMethods(preview.rows, methods, [], links);
+	assert.equal(linked[0].paymentMethodId, bpi.id);
+});
+
+test('account check rejects duplicate names and empty selections', async () => {
+	const db = createMemoryBackend();
+	await assert.rejects(
+		() => createImportAccounts(db, [{ label: 'Atome', name: 'Atome', selected: false }]),
+		/Select at least one account/
+	);
+	await assert.rejects(
+		() =>
+			createImportAccounts(db, [
+				{ label: 'Atome', name: 'Same name', selected: true },
+				{ label: 'GCash', name: 'same name', selected: true },
+			]),
+		/both be named/
+	);
+	await assert.rejects(
+		() => createImportAccounts(db, [{ label: 'Atome', name: '   ', selected: true }]),
+		/name/
+	);
+	assert.equal((await listPaymentMethods(db)).length, 0);
+});
+
+test('missing accounts fall back to the default when no account is created', async () => {
 	const db = createMemoryBackend();
 	const bpi = await savePaymentMethod(db, { label: 'BPI Debit', kind: 'card', openingBalanceCents: 100_000 });
 	const rows = [
@@ -340,9 +429,7 @@ test('missing accounts fall back to the default when creation is off', async () 
 	const result = await importRows(db, rows, {
 		defaultMethodId: bpi.id,
 		existing: [],
-		createMissingMethods: false,
 	});
-	assert.deepEqual(result.createdMethods, []);
 	assert.equal((await listPaymentMethods(db)).length, 1);
 	const [transaction] = await listTransactions(db);
 	assert.equal(transaction.paymentMethodId, bpi.id);

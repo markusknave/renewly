@@ -2,7 +2,15 @@ import { openDb } from './db.js';
 import * as store from './store.js';
 import * as finance from './finance.js';
 import { answerQuestion, buildInsights } from './insights.js';
-import { analyzeRows, importRows, parseImportFile, recategorizeRows } from './import.js';
+import {
+	analyzeRows,
+	createImportAccounts,
+	importRows,
+	linkRowsToMethods,
+	missingAccountsFor,
+	parseImportFile,
+	recategorizeRows,
+} from './import.js';
 import { parseReceipt } from './receipt.js';
 import { recognizeImage } from './ocr.js';
 import * as report from './export.js';
@@ -50,6 +58,7 @@ const state = {
 	importBusy: false,
 	importDefaultMethodId: null,
 	importOpen: false,
+	importAccounts: null,
 	scanBusy: false,
 	scanObjectUrl: null,
 };
@@ -294,6 +303,8 @@ async function render() {
 			importPreview: state.importPreview,
 			importBusy: state.importBusy,
 			importDefaultMethodId: state.importDefaultMethodId ?? state.methods[0]?.id ?? null,
+			importAccounts: state.importAccounts,
+			importMethodsCount: state.methods.length,
 		});
 	} else if (route.name === 'goals') {
 		body = views.goalsView({
@@ -398,7 +409,9 @@ async function render() {
 	if (token !== renderToken) return;
 	app.innerHTML = banner(flash) + body;
 	views.enhanceSelects(app);
-	if (route.name === 'expenses' && state.importOpen) {
+	if (route.name === 'expenses' && state.importAccounts?.length) {
+		showDialog(document.getElementById('import-accounts-dialog'));
+	} else if (route.name === 'expenses' && state.importOpen) {
 		showDialog(document.getElementById('transaction-import-dialog'));
 	}
 	if (route.name === 'catalog') filterCatalog();
@@ -845,6 +858,7 @@ async function newGoal() {
 function refreshImportPreview(preview) {
 	const rows = preview.rows || [];
 	preview.analysis = analyzeRows(rows);
+	preview.missingMethods = missingAccountsFor(rows);
 	preview.stats = {
 		...preview.stats,
 		expenseCount: rows.filter((row) => row.type === 'expense').length,
@@ -959,12 +973,22 @@ async function handleImportFile(file) {
 			today: todayIso(),
 		});
 		state.importPreview = preview;
+		state.importAccounts = preview.missingMethods.length
+			? preview.missingMethods.map((account) => ({
+					...account,
+					name: account.label,
+					selected: true,
+				}))
+			: null;
+		state.importOpen = !state.importAccounts;
 		state.flash = {
 			type: 'ok',
 			message: `Read ${preview.rows.length} transaction row${preview.rows.length === 1 ? '' : 's'} from ${file.name}`,
 		};
 	} catch (err) {
 		state.importPreview = null;
+		state.importAccounts = null;
+		state.importOpen = true;
 		state.flash = { type: 'error', message: err?.message || 'Could not read that file.' };
 	} finally {
 		state.importBusy = false;
@@ -1289,13 +1313,41 @@ async function onSubmit(event) {
 			await render();
 			return;
 		}
+		if (type === 'import-accounts') {
+			const fd = new FormData(form);
+			const accounts = (state.importAccounts || []).map((account, index) => ({
+				...account,
+				selected: fd.get(`account-${index}`) === '1',
+				name: String(fd.get(`name-${index}`) || '').trim() || account.label,
+			}));
+			const { created, links, methods } = await createImportAccounts(state.db, accounts, {
+				today: todayIso(),
+			});
+			state.methods = methods;
+			const preview = state.importPreview;
+			if (preview) {
+				preview.rows = linkRowsToMethods(preview.rows, methods, state.transactions, links);
+				refreshImportPreview(preview);
+				state.importPreview = preview;
+			}
+			state.importAccounts = null;
+			state.importOpen = true;
+			state.flash = {
+				type: 'ok',
+				message: created.length
+					? `Added ${created.map((method) => method.label).join(', ')}. Review the transactions next.`
+					: 'Accounts linked. Review the transactions next.',
+			};
+			await reload();
+			await render();
+			return;
+		}
 		if (type === 'import-expenses') {
 			const fd = new FormData(form);
 			const defaultMethodId = readNumber(fd.get('defaultMethodId'));
 			const result = await importRows(state.db, state.importPreview?.rows || [], {
 				defaultMethodId,
 				existing: state.transactions,
-				createMissingMethods: fd.get('createMissingMethods') === '1',
 				today: todayIso(),
 			});
 			const importedParts = [];
@@ -1307,11 +1359,6 @@ async function onSubmit(event) {
 			}
 			if (result.importedTransfer) {
 				importedParts.push(`${result.importedTransfer} transfer${result.importedTransfer === 1 ? '' : 's'}`);
-			}
-			if (result.createdMethods?.length) {
-				importedParts.push(
-					`created ${result.createdMethods.map((method) => method.label).join(', ')}`
-				);
 			}
 			state.importPreview = null;
 			state.importOpen = false;
@@ -1437,6 +1484,13 @@ async function onClick(event) {
 			else if (action === 'close-transaction-import') {
 				state.importOpen = false;
 				closeDialog('transaction-import-dialog');
+			}
+			else if (action === 'close-import-accounts') {
+				state.importAccounts = null;
+				state.importPreview = null;
+				state.importOpen = true;
+				await render();
+				showDialog(document.getElementById('transaction-import-dialog'));
 			}
 			else if (action === 'open-export') showDialog(document.getElementById('export-dialog'));
 			else if (action === 'close-export') closeDialog('export-dialog');
@@ -1731,6 +1785,12 @@ async function onChange(event) {
 	if (target.matches('[data-expense-method]')) {
 		state.filters.methodId = target.value;
 		filterExpenseDom();
+		return;
+	}
+	if (target.matches('[data-import-account-toggle]')) {
+		const item = target.closest('.import-account-item');
+		const input = item?.querySelector('[data-import-account-name]');
+		if (input) input.disabled = !target.checked;
 		return;
 	}
 	if (target.matches('[data-expense-type]')) {
