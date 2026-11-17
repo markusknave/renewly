@@ -6,12 +6,32 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-2.4-hotfix-2](https://github.com/markusknave/renewly/releases/tag/beta-2.4-hotfix-2),
+[beta-2.5](https://github.com/markusknave/renewly/releases/tag/beta-2.5),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-2.4-hotfix-2.apk
+renewly-beta-2.5.apk
 ```
+
+## What is new in beta-2.5
+
+- **Camera photos scan again.** Receipt photos are decoded with their EXIF
+  orientation, normalized to a 2400 px long edge instead of 1800 px, and handed
+  to the OCR engine as JPEG. Camera frames are downscaled during decode, so a
+  12–200 megapixel photo no longer has to be materialised at full size.
+- **Sparse receipt layouts keep every field.** Sparse-text segmentation keeps
+  the shop name, the label column, and the right-aligned amounts. Photographed
+  receipts that used to fill the address as the merchant now fill the shop name.
+- **Split totals are paired.** When OCR puts `TOTAL` and `694.40` on separate
+  lines, the parser pairs the label with the adjacent amount and does not pick
+  the cash tendered or change values.
+- **A reopened dialog scans the next receipt.** Each scan has a run token. The
+  in-flight scan from the previous dialog is discarded, and the photo chosen
+  after reopening fills the form instead of being silently ignored.
+- **Scans cannot hang forever.** A scan that does not finish within 60 seconds
+  stops with an error, and the next scan starts a fresh worker.
+- **Unsupported photos explain themselves.** A format the browser cannot decode
+  reports a JPEG or PNG hint instead of the engine's internal error.
 
 ## What is new in beta-2.4-hotfix-2
 
@@ -290,6 +310,12 @@ renewly-beta-2.4-hotfix-2.apk
 - The bundled OCR engine reads the photo in a Web Worker. Tesseract, its LSTM
   core, and the English fast model live under `public/vendor/tesseract` and are
   precached, so scanning works offline. Nothing is uploaded.
+- Photos are decoded with their EXIF orientation, downscaled to a 2400 px long
+  edge during decode, and read with sparse-text segmentation. A 12–200
+  megapixel camera photo is never decoded at full size, and the shop name and
+  right-aligned amounts survive the photo instead of collapsing into one block.
+- Closing the dialog cancels the scan that was running. Reopening and choosing
+  another photo scans that photo; the previous result is discarded.
 - Receipts fill date, merchant, total, and category. Payslips prefer net pay
   over gross pay. Bank transfer confirmations set the transfer type, direction,
   and the matching saved account when the description names it.
@@ -396,8 +422,15 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-2.4-hotfix-2.apk
+adb install -r renewly-beta-2.5.apk
 ```
+
+### Updating from beta-2.4-hotfix-2
+
+Install beta-2.5 over beta-2.4-hotfix-2. The signing key, IndexedDB schema
+version 3, and JSON backup format 6 are unchanged, so no uninstall or backup
+restore is required. Receipt scans are local and no saved transaction or account
+is rewritten.
 
 ### Updating from beta-2.4-hotfix
 

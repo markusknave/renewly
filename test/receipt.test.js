@@ -101,6 +101,34 @@ Amount received: 2,000.00`,
 	assert.equal(received.merchant, 'Transfer from BPI Debit');
 });
 
+test('sparse OCR lines pair a label with the amount on an adjacent line', () => {
+	// Sparse-text page segmentation puts right-aligned amounts in their own
+	// block, so the label and value can arrive on separate lines.
+	const parsed = parseReceipt(
+		`GOLDEN WOK
+Burgos St, Makati City
+11/16/2026
+Date
+385.00
+1 Beef Hofan
+620.00
+Subtotal
+74.40
+694.40
+VAT 12%
+TOTAL
+1000.00
+CASH
+305.60
+CHANGE`,
+		{ today: '2026-11-17', methods }
+	);
+	assert.equal(parsed.date, '2026-11-16');
+	assert.equal(parsed.amountCents, 69_440);
+	assert.equal(parsed.merchant, 'GOLDEN WOK');
+	assert.deepEqual(parsed.warnings, []);
+});
+
 test('unreadable photos return what was found plus warnings', () => {
 	const parsed = parseReceipt('BLURRED TEXT 123', { today: '2026-11-13', methods });
 	assert.equal(parsed.type, 'expense');

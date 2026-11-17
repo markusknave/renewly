@@ -8,6 +8,8 @@ import { matchTransferMethod } from './importers/table.js';
 
 const MONEY = /(?:₱|php|p)?\s*(\d[\d,]*(?:\.\d{1,2})?)/i;
 const DECIMAL_MONEY = /(?:₱|php|p)?\s*(\d[\d,]*\.\d{2})/i;
+const MONEY_ONLY = /^(?:₱|php|p)?\s*(\d[\d,]*(?:\.\d{1,2})?)$/i;
+const CASH_PEER = /^(?:cash|tendered|amount\s+tendered|change|payment|card|debit|credit)\b/i;
 
 const TOTAL_LABELS = [
 	[/(?:grand\s+total|total\s+amount\s+due|total\s+due|amount\s+due|amount\s+payable)/i, 100],
@@ -43,6 +45,30 @@ function moneyFrom(line) {
 	return cents;
 }
 
+function moneyNear(lines, index) {
+	// Sparse-text OCR often puts a right-aligned amount in its own block, just
+	// before or after the label. Prefer a value that does not sit next to a
+	// cash/change label, so TOTAL does not pick up the cash tendered amount.
+	let fallback = null;
+	for (const distance of [1, 2]) {
+		for (const direction of [-1, 1]) {
+			const valueIndex = index + direction * distance;
+			const line = lines[valueIndex];
+			if (!line) continue;
+			const match = line.match(MONEY_ONLY);
+			if (!match) continue;
+			const cents = parseNumericAmount(match[1]);
+			if (!Number.isInteger(cents) || cents <= 0) continue;
+			if (!fallback) fallback = cents;
+			const previous = lines[valueIndex - 1];
+			const next = lines[valueIndex + 1];
+			if (CASH_PEER.test(previous || '') || CASH_PEER.test(next || '')) continue;
+			return cents;
+		}
+	}
+	return fallback;
+}
+
 function amountFor(lines, { income = false } = {}) {
 	let best = null;
 	lines.forEach((line, index) => {
@@ -50,7 +76,7 @@ function amountFor(lines, { income = false } = {}) {
 			const match = line.match(pattern);
 			if (!match) continue;
 			const after = line.slice(match.index + match[0].length);
-			const cents = moneyFrom(after) ?? moneyFrom(line);
+			const cents = moneyFrom(after) ?? moneyFrom(line) ?? moneyNear(lines, index);
 			if (!cents) continue;
 			const incomeBonus = income && score >= 100 && /net\s+pay|net\s+income|take\s+home|net\s+amount/i.test(match[0]) ? 25 : 0;
 			const candidate = { cents, score: score + incomeBonus, index };

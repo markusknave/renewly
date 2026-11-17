@@ -61,7 +61,7 @@ const state = {
 	importDefaultChosen: false,
 	importOpen: false,
 	importAccounts: null,
-	scanBusy: false,
+	scanRunId: 0,
 	scanObjectUrl: null,
 };
 
@@ -735,7 +735,14 @@ function syncExpenseDialogType(form) {
 	views.refreshSelect(target);
 }
 
+function cancelExpenseScan() {
+	// Bumping the run id makes any in-flight scan discard its progress and
+	// result, so a reopened dialog never receives the previous photo's fields.
+	state.scanRunId += 1;
+}
+
 function resetScanUi(form) {
+	cancelExpenseScan();
 	const dialog = form.closest('dialog');
 	const row = dialog?.querySelector('.scan-row');
 	if (row) row.classList.remove('is-busy');
@@ -897,11 +904,17 @@ function setScanStatus(dialog, message, { error = false } = {}) {
 }
 
 async function handleScanFile(file) {
-	if (!file || state.scanBusy) return;
+	if (!file) return;
 	const dialog = document.getElementById('expense-dialog');
 	const form = dialog?.querySelector('form[data-form="expense"]');
-	if (!form) return;
-	state.scanBusy = true;
+	if (!dialog || !form || !dialog.open) return;
+
+	// A reopened dialog starts a new run. The previous scan, if still running,
+	// finishes in the background but its progress and result are discarded.
+	const runId = state.scanRunId + 1;
+	state.scanRunId = runId;
+	const isCurrent = () => state.scanRunId === runId && dialog.open;
+
 	const row = dialog.querySelector('.scan-row');
 	const button = dialog.querySelector('[data-scan-button]');
 	row?.classList.add('is-busy');
@@ -919,6 +932,7 @@ async function handleScanFile(file) {
 	try {
 		const { text } = await recognizeImage(file, {
 			onProgress: ({ status, progress }) => {
+				if (!isCurrent()) return;
 				const label =
 					status === 'recognizing text'
 						? 'Reading the text…'
@@ -931,6 +945,7 @@ async function handleScanFile(file) {
 				setScanStatus(dialog, percent !== null ? `${label} ${percent}%` : label);
 			},
 		});
+		if (!isCurrent()) return;
 		const parsed = parseReceipt(text, { today: todayIso(), methods: state.methods });
 		if (!text.trim()) {
 			setScanStatus(dialog, 'No text was readable. Try a sharper, well-lit photo.', { error: true });
@@ -960,11 +975,13 @@ async function handleScanFile(file) {
 			{ error: parsed.warnings.length > 0 }
 		);
 	} catch (err) {
+		if (!isCurrent()) return;
 		setScanStatus(dialog, err?.message || 'Could not read that photo.', { error: true });
 	} finally {
-		state.scanBusy = false;
-		row?.classList.remove('is-busy');
-		if (button) button.disabled = false;
+		if (isCurrent()) {
+			row?.classList.remove('is-busy');
+			if (button) button.disabled = false;
+		}
 	}
 }
 
@@ -1558,7 +1575,10 @@ async function onClick(event) {
 			}
 			else if (action === 'edit-expense') openExpenseDialog(Number(trigger.dataset.id));
 			else if (action === 'delete-expense') await deleteExpense(Number(trigger.dataset.id));
-			else if (action === 'close-expense') closeDialog('expense-dialog');
+			else if (action === 'close-expense') {
+				cancelExpenseScan();
+				closeDialog('expense-dialog');
+			}
 			else if (action === 'new-goal') await newGoal();
 			else if (action === 'edit-goal') openGoalDialog(Number(trigger.dataset.id));
 			else if (action === 'delete-goal') await deleteGoal(Number(trigger.dataset.id));
@@ -2041,6 +2061,15 @@ async function boot() {
 	document.addEventListener('submit', onSubmit);
 	document.addEventListener('change', onChange);
 	document.addEventListener('input', onInput);
+	// Escape and the system back button close the dialog without the close
+	// button, so cancel any in-flight scan here as well.
+	document.addEventListener(
+		'close',
+		(event) => {
+			if (event.target?.id === 'expense-dialog') cancelExpenseScan();
+		},
+		true
+	);
 	document.addEventListener('dragover', (event) => {
 		if (event.target.closest('.dropzone')) event.preventDefault();
 	});

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renewly-shell-v12';
+const CACHE_NAME = 'renewly-shell-v13';
 const FONT_ASSETS = [
 	'./fonts/poppins-400.woff2',
 	'./fonts/poppins-500.woff2',
@@ -55,6 +55,7 @@ const APP_ASSETS = [
 	'./js/lib/providers.js',
 	'./js/lib/timezones.js',
 	'./js/lib/categories.js',
+	'./js/lib/image.js',
 	'./js/lib/cardThemes.js',
 	'./js/lib/combobox.js',
 	'./js/lib/themes.js',
