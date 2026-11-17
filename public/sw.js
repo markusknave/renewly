@@ -1,4 +1,4 @@
-const CACHE_NAME = 'renewly-shell-v13';
+const CACHE_NAME = 'renewly-shell-v14';
 const FONT_ASSETS = [
 	'./fonts/poppins-400.woff2',
 	'./fonts/poppins-500.woff2',
@@ -62,7 +62,7 @@ const APP_ASSETS = [
 	'./vendor/tesseract/tesseract.min.js',
 	'./vendor/tesseract/worker.min.js',
 	'./vendor/tesseract/tesseract-core-lstm.wasm.js',
-	'./vendor/tesseract/lang/eng.traineddata.gz',
+	'./vendor/tesseract/lang/eng.traineddata',
 	'./data/plans.json',
 	'./manifest.webmanifest',
 	'./favicon.svg',
