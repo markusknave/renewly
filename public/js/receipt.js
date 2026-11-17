@@ -46,27 +46,38 @@ function moneyFrom(line) {
 }
 
 function moneyNear(lines, index) {
-	// Sparse-text OCR often puts a right-aligned amount in its own block, just
-	// before or after the label. Prefer a value that does not sit next to a
-	// cash/change label, so TOTAL does not pick up the cash tendered amount.
-	let fallback = null;
+	const valueAt = (valueIndex) => {
+		const line = lines[valueIndex];
+		if (!line) return null;
+		const match = line.match(MONEY_ONLY);
+		if (!match) return null;
+		const cents = parseNumericAmount(match[1]);
+		return Number.isInteger(cents) && cents > 0 ? cents : null;
+	};
+	// Sparse-text OCR usually puts a right-aligned amount after its label.
+	// Accept the immediately following amount even when a CASH line follows it;
+	// that amount is the total, while the cash tendered value is after CASH.
 	for (const distance of [1, 2]) {
-		for (const direction of [-1, 1]) {
-			const valueIndex = index + direction * distance;
-			const line = lines[valueIndex];
-			if (!line) continue;
-			const match = line.match(MONEY_ONLY);
-			if (!match) continue;
-			const cents = parseNumericAmount(match[1]);
-			if (!Number.isInteger(cents) || cents <= 0) continue;
-			if (!fallback) fallback = cents;
-			const previous = lines[valueIndex - 1];
-			const next = lines[valueIndex + 1];
-			if (CASH_PEER.test(previous || '') || CASH_PEER.test(next || '')) continue;
-			return cents;
-		}
+		const cents = valueAt(index + distance);
+		if (!cents) continue;
+		if (distance > 1 && CASH_PEER.test(lines[index + 1] || '')) continue;
+		return cents;
 	}
-	return fallback;
+	// Some layouts put the amount above the label. Skip a value that belongs to
+	// a neighboring cash, tendered, or change line.
+	for (const distance of [1, 2]) {
+		const valueIndex = index - distance;
+		const cents = valueAt(valueIndex);
+		if (!cents) continue;
+		if (
+			CASH_PEER.test(lines[valueIndex - 1] || '') ||
+			CASH_PEER.test(lines[valueIndex + 1] || '')
+		) {
+			continue;
+		}
+		return cents;
+	}
+	return null;
 }
 
 function amountFor(lines, { income = false } = {}) {
@@ -92,8 +103,10 @@ function amountFor(lines, { income = false } = {}) {
 	// document. This catches receipts whose total label OCR mangled.
 	const start = Math.floor(lines.length / 2);
 	let largest = null;
-	for (const line of lines.slice(start)) {
+	for (let index = start; index < lines.length; index += 1) {
+		const line = lines[index];
 		if (/\b(subtotal|vat|tax|discount|change|cash|tendered|balance|tip|shipping)\b/i.test(line)) continue;
+		if (CASH_PEER.test(lines[index - 1] || '') || CASH_PEER.test(lines[index + 1] || '')) continue;
 		for (const match of line.matchAll(new RegExp(DECIMAL_MONEY.source, 'gi'))) {
 			const cents = parseNumericAmount(match[1]);
 			if (Number.isInteger(cents) && cents > 0 && (!largest || cents > largest)) largest = cents;
@@ -104,7 +117,7 @@ function amountFor(lines, { income = false } = {}) {
 
 function dateFor(lines, today) {
 	const candidates = [];
-	for (const line of lines.slice(0, 16)) {
+	for (const line of lines) {
 		if (!DATE_HINT.test(line) && candidates.length > 3) continue;
 		const date = parseDateLoose(line, { today });
 		if (!date) continue;

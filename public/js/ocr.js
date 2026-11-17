@@ -10,6 +10,7 @@ const IDLE_MS = 90_000;
 const MAX_IMAGE_EDGE = 2400;
 const HEADER_BYTES = 262_144;
 const RECOGNIZE_TIMEOUT_MS = 60_000;
+const WORKER_TIMEOUT_MS = 45_000;
 
 let libraryPromise = null;
 let workerPromise = null;
@@ -81,6 +82,9 @@ async function getWorker() {
 			workerPath: asset('worker.min.js'),
 			corePath: asset('tesseract-core-lstm.wasm.js'),
 			langPath: new URL('lang/', ASSET_ROOT).href,
+			// Android strips the .gz suffix when packaging assets, so the model
+			// is shipped as eng.traineddata and fetched without gzip.
+			gzip: false,
 			workerBlobURL: false,
 			logger: (message) => {
 				if (activeProgress && message?.status) activeProgress(message);
@@ -103,7 +107,12 @@ async function getWorker() {
 	return workerPromise;
 }
 
-function withTimeout(promise, milliseconds, onTimeout) {
+function withTimeout(
+	promise,
+	milliseconds,
+	onTimeout,
+	message = 'Reading the photo took too long. Try again with a smaller photo.'
+) {
 	let timer = null;
 	return new Promise((resolve, reject) => {
 		timer = setTimeout(() => {
@@ -113,7 +122,7 @@ function withTimeout(promise, milliseconds, onTimeout) {
 			} catch {
 				// The timeout error below is the useful one.
 			}
-			reject(new Error('Reading the photo took too long. Try again with a smaller photo.'));
+			reject(new Error(message));
 		}, milliseconds);
 		promise.then(
 			(value) => {
@@ -239,9 +248,16 @@ async function prepareImage(file) {
 }
 
 async function runRecognition(file, onProgress) {
-	const worker = await getWorker();
 	activeProgress = typeof onProgress === 'function' ? onProgress : null;
 	try {
+		const worker = await withTimeout(
+			getWorker(),
+			WORKER_TIMEOUT_MS,
+			() => {
+				releaseWorker();
+			},
+			'Starting the offline OCR engine took too long. Try again.'
+		);
 		const image = await prepareImage(file);
 		let result;
 		try {

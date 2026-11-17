@@ -7,11 +7,14 @@ the app so OCR works with no network and no model download at runtime.
 | --- | --- | --- |
 | `tesseract.min.js`, `worker.min.js` | `tesseract.js` 7.0.0 | Apache-2.0 |
 | `tesseract-core-lstm.wasm.js` | `tesseract.js-core` 6.1.2 | Apache-2.0 |
-| `lang/eng.traineddata.gz` | `tessdata_fast` 4.0.0 (English) | Apache-2.0 |
+| `lang/eng.traineddata` | `tessdata_fast` 4.0.0 (English) | Apache-2.0 |
 
 Only the non-SIMD LSTM core is bundled: it runs on every WebView and modern
 browser, and receipts are small enough that the slower path is acceptable.
-The English model is the fast variant to keep the APK small.
+The English model is the fast variant to keep the APK small. It is stored
+uncompressed because Android strips a `.gz` suffix when packaging assets, which
+would make Tesseract request a file the APK does not contain. Keep
+`gzip: false` in `ocr.js` when replacing it.
 
 Upgrade by replacing these files with the same names from the upstream
 packages. Keep `ocr.js` pointed at `tesseract-core-lstm.wasm.js` unless the

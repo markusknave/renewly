@@ -114,19 +114,48 @@ Date
 620.00
 Subtotal
 74.40
-694.40
 VAT 12%
 TOTAL
-1000.00
+694.40
 CASH
-305.60
-CHANGE`,
+1000.00
+CHANGE
+305.60`,
 		{ today: '2026-11-17', methods }
 	);
 	assert.equal(parsed.date, '2026-11-16');
 	assert.equal(parsed.amountCents, 69_440);
 	assert.equal(parsed.merchant, 'GOLDEN WOK');
 	assert.deepEqual(parsed.warnings, []);
+});
+
+test('an amount above TOTAL is used when cash follows the label', () => {
+	const parsed = parseReceipt(
+		`GOLDEN WOK
+11/16/2026
+Subtotal
+74.40
+694.40
+VAT 12%
+TOTAL
+CASH
+1000.00
+CHANGE
+305.60`,
+		{ today: '2026-11-17', methods }
+	);
+	assert.equal(parsed.amountCents, 69_440);
+	assert.equal(parsed.merchant, 'GOLDEN WOK');
+});
+
+test('a date below the noisy top of a receipt is still found', () => {
+	const noise = Array.from({ length: 24 }, (_, index) => `NOISE ${index}`).join('\n');
+	const parsed = parseReceipt(`${noise}\n11/17/2026 11:06\nTOTAL DUE PHP 244.00`, {
+		today: '2026-11-17',
+		methods,
+	});
+	assert.equal(parsed.date, '2026-11-17');
+	assert.equal(parsed.amountCents, 24_400);
 });
 
 test('unreadable photos return what was found plus warnings', () => {

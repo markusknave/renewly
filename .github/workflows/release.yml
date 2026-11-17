@@ -72,6 +72,10 @@ jobs:
       - name: Build signed release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
+      - name: Verify bundled OCR model
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          unzip -l "$APK" | grep -q "assets/public/vendor/tesseract/lang/eng.traineddata"
       - name: Verify signature
         run: |
           APK="android/app/build/outputs/apk/release/app-release.apk"

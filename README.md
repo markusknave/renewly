@@ -6,12 +6,31 @@ There is no server, no account, no analytics, and no email forwarding. Every
 transaction, card balance, goal, and setting lives in IndexedDB on the device.
 
 Beta builds are published as GitHub Releases. The latest release is
-[beta-2.5](https://github.com/markusknave/renewly/releases/tag/beta-2.5),
+[beta-2.5-hotfix](https://github.com/markusknave/renewly/releases/tag/beta-2.5-hotfix),
 and its release asset is the installable APK:
 
 ```text
-renewly-beta-2.5.apk
+renewly-beta-2.5-hotfix.apk
 ```
+
+## What is new in beta-2.5-hotfix
+
+- **Receipt scanning works in the Android build.** Android strips the `.gz`
+  suffix when packaging assets, so the packaged app had
+  `eng.traineddata` while Tesseract requested `eng.traineddata.gz`. The engine
+  now loads the uncompressed model with `gzip: false`, and the init step shows
+  progress instead of leaving the dialog at “Reading the photo…”.
+- **Initialization cannot hang silently.** Creating the offline OCR worker now
+  has its own 45-second timeout, separate from the 60-second recognition
+  timeout. A failed start reports an error and the next scan starts fresh.
+- **Split totals prefer the amount after the label.** `TOTAL` followed by
+  `244.00`, `CASH`, and `CHANGE` now fills 244.00 instead of the last item
+  price or cash tendered.
+- **Dates below OCR noise are found.** A receipt date that lands below several
+  garbage lines is still used instead of falling back to today.
+- **Language model packaged intact.** The model is shipped as uncompressed
+  `eng.traineddata`, precached by the service worker, and covered by an asset
+  test.
 
 ## What is new in beta-2.5
 
@@ -422,12 +441,19 @@ Play Store. Android may warn that the app is from an unknown developer; that is
 expected for a beta sideload.
 
 ```bash
-adb install -r renewly-beta-2.5.apk
+adb install -r renewly-beta-2.5-hotfix.apk
 ```
+
+### Updating from beta-2.5
+
+Install beta-2.5-hotfix over beta-2.5. The signing key, IndexedDB schema version
+3, and JSON backup format 6 are unchanged, so no uninstall or backup restore is
+required. The OCR model path and parser only affect new scans; saved
+transactions are not rewritten.
 
 ### Updating from beta-2.4-hotfix-2
 
-Install beta-2.5 over beta-2.4-hotfix-2. The signing key, IndexedDB schema
+Install beta-2.5-hotfix over beta-2.4-hotfix-2. The signing key, IndexedDB schema
 version 3, and JSON backup format 6 are unchanged, so no uninstall or backup
 restore is required. Receipt scans are local and no saved transaction or account
 is rewritten.
